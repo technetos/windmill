@@ -13,8 +13,7 @@ pub struct Request<T> {
     data: T,
 }
 
-
-/// A trait representing an async conversion into T.
+/// A trait representing an async conversion into T
 pub trait AsyncInto<T> {
     fn async_into<'a>(self) -> Box<dyn Future<Output = Result<T, Error>> + Unpin + 'a>;
 }
@@ -33,4 +32,15 @@ where
 }
 
 #[test]
-fn test() {}
+fn test() {
+    struct GetUserId;
+
+    impl AsyncInto<Request<GetUserId>> for GetUserId {
+        fn async_into<'a>(self) -> Box<dyn Future<Output = Result<Request<GetUserId>, Error>> + Unpin + 'a> {
+            Box::new(future::ready(Ok(Request {
+                context: Context {},
+                data: self
+            })))
+        }
+    }
+}
