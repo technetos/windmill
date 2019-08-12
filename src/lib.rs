@@ -1,7 +1,6 @@
 use futures::future;
-use futures::future::BoxFuture;
 use futures::future::Future;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub struct Error {
     msg: String,
@@ -14,27 +13,23 @@ pub struct Request<T> {
     data: T,
 }
 
-pub trait IntoRequest<T>: Sized {
-    fn to_req<
-        I: Into<Request<T>>,
-        F: Future<Output = Result<Self, Error>>>(
-            raw: I
-        ) -> F;
+
+/// A trait representing an async conversion into T.
+pub trait AsyncInto<T> {
+    fn async_into<'a>(self) -> Box<dyn Future<Output = Result<T, Error>> + Unpin + 'a>;
 }
 
-impl<T> IntoRequest<T> for Request<T>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    fn to_req<
-        I: Into<Request<T>>,
-        F: Future<Output = Result<Request<T>, Error>>>(
-            raw: I,
-        ) -> F {
-            // Returns F, a future whos output is either a
-            // Request<T> or an Error
+pub trait IntoRequest<'a, T: 'a>: AsyncInto<Request<T>> {
+    fn into_request(self) -> Box<dyn Future<Output = Result<Request<T>, Error>> + Unpin + 'a>;
+}
 
-        }
+impl<'a, T: 'a> IntoRequest<'a, T> for T
+where
+    T: for<'de> Deserialize<'de> + Serialize + AsyncInto<Request<T>>,
+{
+    fn into_request(self) -> Box<dyn Future<Output = Result<Request<T>, Error>> + Unpin + 'a> {
+        Box::new(self.async_into())
+    }
 }
 
 #[test]
