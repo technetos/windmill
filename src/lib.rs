@@ -1,15 +1,22 @@
+use bytes::Bytes;
 use futures::future;
 use futures::future::Future;
 use futures::future::FutureExt;
-use serde::{Deserialize, Serialize};
 use http::{Request, Response};
-use std::{net::TcpStream, io::{BufRead, BufReader}};
-use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use std::{
+    io::{BufRead, BufReader},
+    net::TcpStream,
+};
 
-pub type BytesF = Box<Future<Output = Result<Bytes, Error>> + Unpin + Send + 'static>;
+pub type Error = Box<dyn std::error::Error + Send>;
+
+pub type BytesF = Box<dyn Future<Output = Result<Bytes, Error>> + Unpin + Send + 'static>;
+
+pub type ResponseF<T> = Box<dyn Future<Output = Result<T, Error>> + Send + Unpin>;
 
 pub struct Action {
-    f: Box<Fn(TcpStream) -> BytesF>,
+    f: Box<dyn Fn(TcpStream) -> BytesF>,
 }
 
 impl Action {
@@ -18,26 +25,17 @@ impl Action {
     }
 }
 
-pub type Error = Box<std::error::Error>;
-
 pub struct Context;
 
-pub trait Endpoint<Req, Res> {
-    fn run(&self, req: Req) -> Box<Future<Output = Result<Res, Error>> + Send + Unpin>
+pub struct Endpoint;
+
+impl Endpoint {
+    pub fn new<Req: 'static, Res: 'static>(f: fn(Req) -> ResponseF<Res>) -> Action
     where
         Req: for<'de> Deserialize<'de>,
-        Res: Serialize;
-}
-
-pub struct EndpointHandler;
-
-impl EndpointHandler {
-    pub fn handle<Req, Res>(endpoint: impl Endpoint<Req, Res>) -> Action
-    where
-        Req: for<'de> Deserialize<'de>,
-        Res: Serialize
+        Res: Serialize,
     {
-        Action::new(|mut stream: TcpStream| -> BytesF {
+        Action::new(move |stream: TcpStream| -> BytesF {
             let mut request_bytes = Vec::new();
             let mut stream = BufReader::new(stream);
 
@@ -51,40 +49,60 @@ impl EndpointHandler {
                 }
             }
 
-            let req: Req = serde_json::from_slice(&request_bytes).unwrap();
-            let res = endpoint.run(req);
-            Box::new(res.then(|_| {
-                let mut bytes = Bytes::new();
-                bytes.extend_from_slice(b"test response bytes string");
-                Ok(bytes)
-            }))
+            match serde_json::from_slice(&request_bytes) {
+                Ok(req) => {
+                    let res = f(req);
+                    Box::new(res.then(|_| {
+                        let mut bytes = Bytes::new();
+                        bytes.extend_from_slice(b"test response bytes string");
+                        futures::future::ok(bytes)
+                    }))
+                }
+                Err(e) => {
+                    // Respond with error
+                    dbg!(e);
+                    panic!();
+                }
+            }
         })
     }
 }
 
 #[test]
 fn test() {
-    use crate::{Endpoint, EndpointHandler, Error};
+    use crate::Endpoint;
 
     mod messages {
         use serde::{Deserialize, Serialize};
 
-        #[derive(Debug, Deserialize)]
+        #[derive(Deserialize)]
         pub struct TestRequest;
 
         #[derive(Serialize)]
         pub struct TestResponse;
+
+        #[derive(Deserialize)]
+        pub struct LogoutRequest;
+
+        #[derive(Serialize)]
+        pub struct LogoutResponse;
     }
 
     struct TestEndpoint;
 
-    use messages::{TestRequest, TestResponse};
+    use messages::{LogoutRequest, LogoutResponse, TestRequest, TestResponse};
 
-    impl Endpoint<TestRequest, TestResponse> for TestEndpoint {
-        fn run(&self, req: TestRequest) -> Box<Future<Output = Result<TestResponse, Error>> + Unpin> {
+    impl TestEndpoint {
+        pub fn get_token(req: TestRequest) -> ResponseF<TestResponse> {
             Box::new(future::ready(Ok(TestResponse)))
+        }
+
+        pub fn logout(req: LogoutRequest) -> ResponseF<LogoutResponse> {
+            Box::new(future::ready(Ok(LogoutResponse)))
         }
     }
 
-    let handler = EndpointHandler::handle(TestEndpoint);
+    // Wiring
+    let test_service = Endpoint::new(TestEndpoint::get_token);
+    let logout_service = Endpoint::new(TestEndpoint::logout);
 }
