@@ -5,7 +5,7 @@ use futures::future::FutureExt;
 use http::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{BufRead, BufReader},
+    io::{Read, Write, BufRead, BufReader},
     net::TcpStream,
 };
 
@@ -15,22 +15,26 @@ pub type BytesF = Box<dyn Future<Output = Result<Bytes, Error>> + Unpin + Send +
 
 pub type ResponseF<T> = Box<dyn Future<Output = Result<T, Error>> + Send + Unpin>;
 
-pub struct Action {
-    f: Box<dyn Fn(TcpStream) -> BytesF>,
+pub struct Action<S>
+where
+    S: Read + Write,
+{
+    apply: Box<dyn Fn(S) -> BytesF>,
 }
 
-impl Action {
-    pub fn new(f: impl Fn(TcpStream) -> BytesF + 'static) -> Self {
-        Self { f: Box::new(f) }
+impl<S> Action<S>
+where
+    S: Read + Write,
+{
+    pub fn new(f: impl Fn(S) -> BytesF + 'static) -> Self {
+        Self { apply: Box::new(f) }
     }
 }
-
-pub struct Context;
 
 pub struct Endpoint;
 
 impl Endpoint {
-    pub fn new<Req: 'static, Res: 'static>(f: fn(Req) -> ResponseF<Res>) -> Action
+    pub fn new<Req: 'static, Res: 'static>(f: fn(Req) -> ResponseF<Res>) -> Action<TcpStream>
     where
         Req: for<'de> Deserialize<'de>,
         Res: Serialize,
@@ -42,7 +46,7 @@ impl Endpoint {
             loop {
                 request_bytes.clear();
 
-                // really b'\n' should be b"\r\n" but i dont know if that works
+                // really b'\n' should be b"\r\n"
                 let bytes_read = stream.read_until(b'\n', &mut request_bytes).unwrap();
                 if bytes_read == 0 {
                     break;
@@ -59,8 +63,11 @@ impl Endpoint {
                     }))
                 }
                 Err(e) => {
-                    // Respond with error
                     dbg!(e);
+                   Response::builder()
+                        .status(400)
+                        .body(())
+                        .unwrap();
                     panic!();
                 }
             }
@@ -76,7 +83,9 @@ fn test() {
         use serde::{Deserialize, Serialize};
 
         #[derive(Deserialize)]
-        pub struct TestRequest;
+        pub struct TestRequest {
+            pub user_name: String,
+        }
 
         #[derive(Serialize)]
         pub struct TestResponse;
@@ -94,6 +103,7 @@ fn test() {
 
     impl TestEndpoint {
         pub fn get_token(req: TestRequest) -> ResponseF<TestResponse> {
+            dbg!(&req.user_name);
             Box::new(future::ready(Ok(TestResponse)))
         }
 
@@ -102,7 +112,6 @@ fn test() {
         }
     }
 
-    // Wiring
     let test_service = Endpoint::new(TestEndpoint::get_token);
     let logout_service = Endpoint::new(TestEndpoint::logout);
 }
