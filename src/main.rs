@@ -1,4 +1,6 @@
 use turbo::prelude::*;
+use turbo::context::{Context, default_context};
+
 
 use futures::future::{ok, Future, FutureExt, Ready};
 use http_service::{HttpService, Request, Response};
@@ -10,17 +12,21 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 struct TestRequest {
     pub foo: String,
 }
 
 #[derive(Serialize)]
-struct TestResponse;
+struct TestResponse {
+    success: bool,
+}
 
-async fn test_route(req: TestRequest) -> WebResult<TestResponse> {
+async fn test_route(cx: Context, req: TestRequest) -> WebResult<TestResponse> {
     println!("{}", req.foo);
-    Ok(TestResponse)
+    Ok(TestResponse {
+        success: true,
+    })
 }
 
 pub struct Server;
@@ -35,7 +41,7 @@ impl HttpService for Server {
     }
 
     fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let handler = Endpoint::new(test_route);
+        let handler = Endpoint::new(test_route, default_context);
 
         async move { Ok((handler)(req).await) }.boxed()
     }
