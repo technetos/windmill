@@ -3,23 +3,26 @@
 mod endpoint;
 mod error;
 
-use error::WebError;
-use serde_json::json;
+pub mod prelude {
+    pub type WebResult<T> = Result<T, WebError>;
+
+    pub use super::endpoint::Endpoint;
+    pub use super::error::WebError;
+}
 
 #[test]
 fn test() {
-    use crate::endpoint::Endpoint;
-
     mod messages {
         use serde::{Deserialize, Serialize};
 
         #[derive(Deserialize)]
-        pub struct TestRequest {
+        pub struct LoginRequest {
             pub user_name: String,
+            pub password: String,
         }
 
         #[derive(Serialize)]
-        pub struct TestResponse;
+        pub struct LoginResponse;
 
         #[derive(Deserialize)]
         pub struct LogoutRequest {
@@ -32,25 +35,51 @@ fn test() {
         }
     }
 
-    struct TestEndpoint;
+    mod policy {
+        use crate::WebResult;
+        use http::request::Parts;
 
-    use messages::{LogoutRequest, LogoutResponse, TestRequest, TestResponse};
-
-    impl TestEndpoint {
-        pub async fn get_token(req: TestRequest) -> Result<TestResponse, WebError> {
-            Err(WebError {
-                code: http::StatusCode::UNAUTHORIZED,
-                msg: json!("User is unauthorized to access this resource"),
-            })
+        #[derive(Debug)]
+        pub struct Policy {
+            pub token: String,
         }
 
-        pub async fn logout(req: LogoutRequest) -> Result<LogoutResponse, WebError> {
+        impl Policy {
+            pub async fn new(parts: Parts) -> WebResult<Policy> {
+                let token = String::from("foo");
+
+                Ok(Policy { token })
+            }
+        }
+    }
+
+    use crate::endpoint::Endpoint;
+    use serde_json::json;
+
+    struct TestEndpoint;
+
+    use messages::{LoginRequest, LoginResponse, LogoutRequest, LogoutResponse};
+    use policy::Policy;
+
+    impl TestEndpoint {
+        pub async fn get_token(req: LoginRequest) -> WebResult<LoginResponse> {
+            Ok(LoginResponse)
+        }
+
+        pub async fn logout(policy: Policy, req: LogoutRequest) -> WebResult<LogoutResponse> {
+            if &policy.token != "foo" {
+                return Err(WebError {
+                    code: http::StatusCode::UNAUTHORIZED,
+                    msg: json!("User is unauthorized to access this resource"),
+                });
+            }
+
             Ok(LogoutResponse { success: true })
         }
     }
 
-    let test_service = Endpoint::new(TestEndpoint::get_token);
-    let logout_service = Endpoint::new(TestEndpoint::logout);
+    let login_service = Endpoint::new(TestEndpoint::get_token);
+    let logout_service = Endpoint::new_with_policy(TestEndpoint::logout, Policy::new);
 
     let test_req = http_service::Request::new("foo".into());
 }
