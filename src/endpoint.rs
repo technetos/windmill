@@ -1,9 +1,9 @@
 use crate::error::WebError;
 
-use serde::{Deserialize, Serialize};
 use futures::future::{Future, FutureExt};
-use http::{StatusCode, request::Parts, method::Method};
+use http::{method::Method, request::Parts, StatusCode};
 use http_service::{Request, Response};
+use serde::{Deserialize, Serialize};
 use std::{error::Error, pin::Pin};
 
 pub(crate) type AsyncResponse = Pin<Box<dyn Future<Output = Response> + Send>>;
@@ -37,7 +37,9 @@ impl Endpoint {
                 // Wait to receive the body bytes
                 let body_bytes = match body.into_vec().await {
                     Ok(bytes) => bytes,
-                    Err(e) => return error_response(e.description(), StatusCode::INTERNAL_SERVER_ERROR),
+                    Err(e) => {
+                        return error_response(e.description(), StatusCode::INTERNAL_SERVER_ERROR)
+                    }
                 };
 
                 // Parse the body as json if the request has a body
@@ -46,7 +48,7 @@ impl Endpoint {
                         Ok(req) => req,
                         Err(e) => {
                             return error_response(format!("{}", e), StatusCode::BAD_REQUEST);
-                        },
+                        }
                     }
                 } else {
                     Req::default()
@@ -63,7 +65,6 @@ impl Endpoint {
         }
     }
 }
-
 
 fn error_response(msg: impl Serialize, code: http::StatusCode) -> Response {
     let json_vec = serde_json::to_vec(&msg).unwrap();

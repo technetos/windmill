@@ -1,6 +1,5 @@
+use turbo::context::{default_context, Context};
 use turbo::prelude::*;
-use turbo::context::{Context, default_context};
-
 
 use futures::future::{ok, Future, FutureExt, Ready};
 use http_service::{HttpService, Request, Response};
@@ -24,9 +23,7 @@ struct TestResponse {
 
 async fn test_route(cx: Context, req: TestRequest) -> WebResult<TestResponse> {
     println!("{}", req.foo);
-    Ok(TestResponse {
-        success: true,
-    })
+    Ok(TestResponse { success: true })
 }
 
 pub struct Server;
