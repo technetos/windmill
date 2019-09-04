@@ -16,3 +16,11 @@ bufstream = { version = "0.1", features = ["tokio"] }
 tokio = "0.1.22"
 http-service = "0.3.1"
 http-service-hyper = "0.3.1"
+
+[[example]]
+name = "single_route"
+path = "example/single_route.rs"
+
+[[example]]
+name = "custom_context"
+path = "example/custom_context.rs"

@@ -1,4 +1,4 @@
-use turbo::context::{default_context, Context};
+use turbo::context::default_context;
 use turbo::prelude::*;
 
 use futures::future::{ok, Future, FutureExt, Ready};
@@ -22,7 +22,6 @@ struct TestResponse {
 }
 
 async fn test_route(cx: Context, req: TestRequest) -> WebResult<TestResponse> {
-    println!("{}", req.foo);
     Ok(TestResponse { success: true })
 }
 
