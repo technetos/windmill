@@ -67,15 +67,18 @@ impl Endpoint {
 }
 
 fn error_response(msg: impl Serialize, code: http::StatusCode) -> Response {
-    let json_vec = serde_json::to_vec(&msg).unwrap();
-    let mut res = Response::new(json_vec.into());
+    let mut res = into_response(msg);
     *res.status_mut() = code;
     res
 }
 
 fn success_response(msg: impl Serialize) -> Response {
-    let json_vec = serde_json::to_vec(&msg).unwrap();
-    let mut res = Response::new(json_vec.into());
+    let mut res = into_response(msg);
     *res.status_mut() = StatusCode::OK;
     res
+}
+
+fn into_response(msg: impl Serialize) -> Response {
+    let json_vec = serde_json::to_vec(&msg).unwrap();
+    Response::new(json_vec.into())
 }

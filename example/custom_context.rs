@@ -1,16 +1,32 @@
-use turbo::context::default_context;
-use turbo::prelude::*;
+use enzyme::prelude::*;
 
-use http::request::Parts;
 use futures::future::{ok, Future, FutureExt, Ready};
+use http::{request::Parts, status::StatusCode};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
+use serde_json::json;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
 };
 
 use serde::{Deserialize, Serialize};
+
+struct CustomContext {
+    auth_token: String,
+}
+
+async fn auth_context(parts: Parts) -> WebResult<CustomContext> {
+    match parts.headers.get("authorization") {
+        Some(auth_token) => Ok(CustomContext {
+            auth_token: auth_token.to_str().unwrap().to_string(),
+        }),
+        None => Err(WebError {
+            msg: json!("Unauthorized"),
+            code: StatusCode::UNAUTHORIZED,
+        }),
+    }
+}
 
 #[derive(Deserialize, Default)]
 struct TestRequest {
@@ -24,18 +40,6 @@ struct TestResponse {
 
 async fn test_route(cx: CustomContext, req: TestRequest) -> WebResult<TestResponse> {
     Ok(TestResponse { success: true })
-}
-
-struct CustomContext {
-    auth_token: String,
-}
-
-async fn auth_context(parts: Parts) -> WebResult<CustomContext> {
-    // Parse token from headers
-    if let Some(bearer) = parts.headers["authorization"].as_bytes().first() {
-        dbg!(bearer);
-    }
-    Ok(CustomContext { auth_token: "some token".into() })
 }
 
 pub struct Server;
