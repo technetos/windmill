@@ -20,9 +20,10 @@ async fn(ContextType, RequestType) -> WebResult<ResponseType>
 `RequestType` and `ResponseType` can be any type that implements `Deserialize +
 Default` and `Serialize` respectively.  The body of the request is deserialized
 into what ever type is used as `RequestType` and the type used as `ResponseType`
-is serialized into json automatically.  This means you dont have to deal with
-deserialization or serialization of your contract types at all, it is all handled
-internally by the framework.  
+is serialized into json automatically.  This means contract types are
+automatically deserialized and serialized, you just define routes that consume
+your `RequestType` and return your `ResponseType` and the framework does the
+rest.  
 
 ### Context Types
 
@@ -40,9 +41,8 @@ context type and a default context type function called `Context` and
 `Parts` type as a member.  A more elaborate `ContextType` could have members
 such as `auth_token` and the async context function that constructs it could
 parse out and evaluate the `auth_token` for validity before returning the
-`ContextType`.  Finally the `ContextType` is passed into the async route
-function providing access to the context of the request in the route
-handler.   
+`ContextType`.  Finally access to the context of the request is accomplished by
+passing the `ContextType` into the async route function.  
 
 ### Error Handling
 
