@@ -47,7 +47,7 @@ handler.
 ### Error Handling
 
 Async functions used in the framework return a `WebResult` type.  The
-`WebResult` is an Result type with the error parameter set to be a `WebError`.
+`WebResult` is a `Result` type with the error parameter set to be a `WebError`.
 A `WebError` is a message and an error code.  The message can be anything that
 implements `Serialize` and the code is an `StatusCode` type from the `http`
 crate.  
