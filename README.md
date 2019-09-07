@@ -1,4 +1,4 @@
-# Enzyme
+# Enzyme 🧪
 
 A bare bones http web framework that stays out of your way.  
 
