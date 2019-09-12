@@ -1,6 +1,7 @@
 pub mod context;
 pub mod endpoint;
 pub mod error;
+pub mod router;
 
 pub type WebResult<T> = Result<T, error::WebError>;
 
