@@ -3,6 +3,10 @@ pub mod endpoint;
 pub mod error;
 pub mod router;
 
+pub mod macros {
+    pub use enzyme_macro::route;
+}
+
 pub type WebResult<T> = Result<T, error::WebError>;
 
 pub mod prelude {

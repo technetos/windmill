@@ -1,4 +1,6 @@
+#![feature(proc_macro_hygiene)]
 use enzyme::context::default_context;
+use enzyme::macros::route;
 use enzyme::prelude::*;
 
 use futures::future::{ok, Future, FutureExt, Ready};
@@ -37,9 +39,14 @@ impl HttpService for Server {
     }
 
     fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let handler = Endpoint::new(test_route, default_context);
+        let test_endpoint = Endpoint::new(test_route, default_context);
+        let test_endpoint2 = Endpoint::new(test_route, default_context);
 
-        async move { Ok((handler)(req).await) }.boxed()
+
+//        route!("GET", (/"users"/user_id: i32/"me"), test_endpoint);
+//        route!("GET", (/"service_provider"/service_provider_id: u64/"categories"/category_id: u64), test_endpoint2);
+
+        async move { Ok((test_endpoint)(req).await) }.boxed()
     }
 }
 

@@ -16,6 +16,7 @@ bufstream = { version = "0.1", features = ["tokio"] }
 tokio = "0.1.22"
 http-service = "0.3.1"
 http-service-hyper = "0.3.1"
+enzyme_macro = { path = "enzyme_macro" }
 
 [[example]]
 name = "default_context"
