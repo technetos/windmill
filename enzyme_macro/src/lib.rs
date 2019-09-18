@@ -5,42 +5,14 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, Ident, LitStr, Result, Token, Type};
+use syn::{parse_macro_input, Ident, LitStr, Result, Token, Type, punctuated::Punctuated};
 
 #[derive(Debug)]
 struct Route {
+    pub context: Ident,
+    pub handler: Ident,
     pub segments: Vec<Segment>,
-}
-
-impl Route {
-    pub fn struct_name(&self) -> Ident {
-        let mut string = String::new();
-        self.segments.iter().for_each(|segment| match segment {
-            Segment::Static(static_segment) => {
-                string += &static_segment.content.value().to_camel_case();
-            }
-            Segment::Dynamic(dynamic_segment) => {
-                string += &dynamic_segment.field_name.to_string().to_camel_case();
-            }
-        });
-
-        Ident::new(&string, Span::call_site())
-    }
-
-    pub fn fields(&self) -> Vec<proc_macro2::TokenStream> {
-        let mut tokens = vec![];
-        self.segments.iter().for_each(|segment| match segment {
-            Segment::Dynamic(dynamic_segment) => {
-                let field = &dynamic_segment.field_name;
-                let field_type = &dynamic_segment.ty;
-
-                tokens.push(quote!(#field: #field_type));
-            }
-            _ => {},
-        });
-
-        tokens
-    }
+    pub static_segment_positions: Vec<usize>,
 }
 
 #[derive(Debug)]
@@ -64,14 +36,20 @@ impl Parse for Route {
     fn parse(input: ParseStream) -> Result<Self> {
         let _: Token![/] = input.parse()?;
 
+        let mut count = 0;
+        let mut static_segment_positions = vec![];
+
         let segments = {
             let mut segments = vec![];
-            while !input.is_empty() {
+            while !input.is_empty() && !input.peek(Token![=]) && !input.peek2(Token![>]) {
                 let lookahead = input.lookahead1();
                 if lookahead.peek(LitStr) {
                     segments.push(input.parse().map(Segment::Static)?);
+                    static_segment_positions.push(count);
+                    count += 1;
                 } else if lookahead.peek(Ident) {
                     segments.push(input.parse().map(Segment::Dynamic)?);
+                    count += 1;
                 } else if lookahead.peek(Token![/]) {
                     let _: Token![/] = input.parse()?;
                 } else {
@@ -81,7 +59,22 @@ impl Parse for Route {
             segments
         };
 
-        Ok(Self { segments })
+        let _ = input.parse::<Token![=]>()?;
+        let _ = input.parse::<Token![>]>()?;
+
+        let context: Ident = input.parse()?;
+
+        let _ = input.parse::<Token![=]>()?;
+        let _ = input.parse::<Token![>]>()?;
+
+        let handler: Ident = input.parse()?;
+
+        Ok(Self { 
+            context,
+            handler,
+            segments,
+            static_segment_positions,
+        })
     }
 }
 
@@ -103,30 +96,50 @@ impl Parse for DynamicSegment {
     }
 }
 
+impl Route {
+    fn static_segments(&self) -> proc_macro2::TokenStream {
+        let mut segments = vec![];
+        let mut positions = vec![];
+        self.segments.iter().for_each(|segment| {
+            if let Segment::Static(static_segment) = segment {
+                let content = &static_segment.content;
+                segments.push(quote!(#content));
+            }
+        });
+        self.static_segment_positions.iter().for_each(|pos| {
+            positions.push(quote!(#pos));
+        });
+
+        quote! {
+            #(
+                static_segments.push(enzyme::router::StaticSegment {
+                    value: #segments,
+                    position: #positions,
+                });
+            )*
+        }
+    }
+}
+                
+
 #[proc_macro]
 pub fn route(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Route);
 
-    let struct_name = input.struct_name();
-    let fields = input.fields();
+    let push_statements = input.static_segments();
+    let route = input.handler;
+    let context = input.context;
 
     let output = quote! {
-//        |s: &str| -> Result<Route, ()> {
-//            struct UsersUserIdMe {
-//                user_id: i32,
-//            }
-//
-//            impl FromStr for UsersUserIdMe {
-//                fn from_str(blah) -> blah {
-//                    expects "users" value "me"
-//                }
-//            }
-//
-//            UsersUserIdMe::from_str(s)?
-//        }
-        #[derive(Debug)]
-        struct #struct_name {
-            #(#fields,)*
+        || -> enzyme::router::Route {
+            let mut static_segments = vec![];
+
+            #push_statements
+
+            enzyme::router::Route {
+                static_segments,
+                handler: Box::new(enzyme::endpoint::Endpoint::new(#route, #context)),
+            }
         }
     };
     

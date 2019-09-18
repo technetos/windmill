@@ -1,6 +1,8 @@
 #![feature(proc_macro_hygiene)]
 use enzyme::context::default_context;
 use enzyme::macros::route;
+use enzyme::router::Router;
+use http::method::Method;
 use enzyme::prelude::*;
 
 use futures::future::{ok, Future, FutureExt, Ready};
@@ -27,7 +29,9 @@ async fn test_route(cx: Context, req: TestRequest) -> WebResult<TestResponse> {
     Ok(TestResponse { success: true })
 }
 
-pub struct Server;
+pub struct Server {
+    router: Router,
+}
 
 impl HttpService for Server {
     type Connection = ();
@@ -40,18 +44,16 @@ impl HttpService for Server {
 
     fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
         let test_endpoint = Endpoint::new(test_route, default_context);
-        let test_endpoint2 = Endpoint::new(test_route, default_context);
-
-
-//        route!("GET", (/"users"/user_id: i32/"me"), test_endpoint);
-//        route!("GET", (/"service_provider"/service_provider_id: u64/"categories"/category_id: u64), test_endpoint2);
 
         async move { Ok((test_endpoint)(req).await) }.boxed()
     }
 }
 
 fn main() {
-    let s = Server;
+    let mut router = Router::new();
+    router.add(Method::POST, route!(/"users"/user_id: i32/"me" => default_context => test_route));
+
+    let s = Server { router };
 
     http_service_hyper::run(
         s,
