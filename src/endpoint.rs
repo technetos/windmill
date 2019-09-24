@@ -6,7 +6,8 @@ use http_service::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, pin::Pin};
 
-pub(crate) type AsyncResponse = Pin<Box<dyn Future<Output = Response> + Send>>;
+pub(crate) type AsyncResponse =
+    Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>>;
 
 pub struct Endpoint;
 
@@ -66,16 +67,19 @@ impl Endpoint {
     }
 }
 
-fn error_response(msg: impl Serialize, code: http::StatusCode) -> Response {
+pub(crate) fn error_response(
+    msg: impl Serialize,
+    code: http::StatusCode,
+) -> Result<Response, std::io::Error> {
     let mut res = into_response(msg);
     *res.status_mut() = code;
-    res
+    Ok(res)
 }
 
-fn success_response(msg: impl Serialize) -> Response {
+fn success_response(msg: impl Serialize) -> Result<Response, std::io::Error> {
     let mut res = into_response(msg);
     *res.status_mut() = StatusCode::OK;
-    res
+    Ok(res)
 }
 
 fn into_response(msg: impl Serialize) -> Response {

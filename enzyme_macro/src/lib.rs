@@ -13,6 +13,7 @@ struct Route {
     pub handler: Ident,
     pub segments: Vec<Segment>,
     pub static_segment_positions: Vec<usize>,
+    pub dynamic_segment_positions: Vec<usize>,
 }
 
 #[derive(Debug)]
@@ -38,6 +39,7 @@ impl Parse for Route {
 
         let mut count = 0;
         let mut static_segment_positions = vec![];
+        let mut dynamic_segment_positions = vec![];
 
         let segments = {
             let mut segments = vec![];
@@ -49,6 +51,7 @@ impl Parse for Route {
                     count += 1;
                 } else if lookahead.peek(Ident) {
                     segments.push(input.parse().map(Segment::Dynamic)?);
+                    dynamic_segment_positions.push(count);
                     count += 1;
                 } else if lookahead.peek(Token![/]) {
                     let _: Token![/] = input.parse()?;
@@ -74,6 +77,7 @@ impl Parse for Route {
             handler,
             segments,
             static_segment_positions,
+            dynamic_segment_positions,
         })
     }
 }
@@ -98,25 +102,42 @@ impl Parse for DynamicSegment {
 
 impl Route {
     fn static_segments(&self) -> proc_macro2::TokenStream {
-        let mut segments = vec![];
-        let mut positions = vec![];
+        let mut static_segments = vec![];
+        let mut static_positions = vec![];
+        let mut dynamic_positions = vec![];
         self.segments.iter().for_each(|segment| {
             if let Segment::Static(static_segment) = segment {
                 let content = &static_segment.content;
-                segments.push(quote!(#content));
+                static_segments.push(quote!(#content));
             }
         });
         self.static_segment_positions.iter().for_each(|pos| {
-            positions.push(quote!(#pos));
+            static_positions.push(quote!(#pos));
+        });
+        self.dynamic_segment_positions.iter().for_each(|pos| {
+            dynamic_positions.push(quote!(#pos));
         });
 
-        quote! {
+        let static_segment_inserts = quote! {
             #(
                 static_segments.push(enzyme::router::StaticSegment {
-                    value: #segments,
-                    position: #positions,
+                    value: #static_segments,
+                    position: #static_positions,
                 });
             )*
+        };
+
+        let dynamic_segment_inserts = quote! {
+            #(
+                dynamic_segments.push(enzyme::router::DynamicSegment {
+                    position: #dynamic_positions,
+                });
+            )*
+        };
+
+        quote! {
+            #static_segment_inserts
+            #dynamic_segment_inserts
         }
     }
 }
@@ -133,11 +154,13 @@ pub fn route(tokens: TokenStream) -> TokenStream {
     let output = quote! {
         || -> enzyme::router::Route {
             let mut static_segments = vec![];
+            let mut dynamic_segments = vec![];
 
             #push_statements
 
             enzyme::router::Route {
                 static_segments,
+                dynamic_segments,
                 handler: Box::new(enzyme::endpoint::Endpoint::new(#route, #context)),
             }
         }

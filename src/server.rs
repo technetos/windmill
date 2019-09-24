@@ -1,47 +1,43 @@
-use http_service::{HttpService, Request, Response};
-use futures::future::{ok, Future, FutureExt, Ready};
 use crate::router::Router;
+
+use futures::future::{ok, Future, Ready};
+use http_service::{HttpService, Request, Response};
 use http_service_hyper;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
+    sync::Arc,
 };
 
 pub struct Server {
-    router: Router,
-}
-
-impl Server {
-    pub fn new(router: Router) -> Self {
-        Self {
-            router
-        }
-    }
-
+    router: Arc<Router>,
 }
 
 impl HttpService for Server {
     type Connection = ();
     type ConnectionFuture = Ready<Result<(), std::io::Error>>;
-    type ResponseFuture = Pin<Box<Future<Output = Result<Response, std::io::Error>> + Send>>;
+    type ResponseFuture = Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>>;
 
     fn connect(&self) -> Self::ConnectionFuture {
         ok(())
     }
 
     fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let method = req.method();
-        let routes = self.router.lookup(method);
-
-        for route in routes {
-                return async move { Ok((route.handler)(req).await) }.boxed();
-            }
-        }
+        self.router.clone().lookup(req)
     }
 }
 
-fn paths_match(route: &Route, incoming_path: &str) -> bool {
-    route.static_segments == RawRoute::from(incoming_path).static_segments
-}
+impl Server {
+    pub fn new(router: Router) -> Self {
+        Self {
+            router: Arc::new(router),
+        }
+    }
 
-        
+    pub fn run(self) {
+        http_service_hyper::run(
+            self,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000),
+        );
+    }
+}

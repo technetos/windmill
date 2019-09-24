@@ -1,16 +1,15 @@
-use enzyme::prelude::*;
-
-use futures::future::{ok, Future, FutureExt, Ready};
-use http::{request::Parts, status::StatusCode};
-use http_service::{HttpService, Request, Response};
-use http_service_hyper;
-use serde_json::json;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    pin::Pin,
+#![feature(proc_macro_hygiene)]
+use enzyme::{
+    macros::route,
+    result::WebResult,
+    router::Router,
+    server::Server,
+    error::WebError,
 };
 
+use http::{method::Method, request::Parts, status::StatusCode};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 struct CustomContext {
     auth_token: String,
@@ -42,29 +41,23 @@ async fn test_route(cx: CustomContext, req: TestRequest) -> WebResult<TestRespon
     Ok(TestResponse { success: true })
 }
 
-pub struct Server;
-
-impl HttpService for Server {
-    type Connection = ();
-    type ConnectionFuture = Ready<Result<(), std::io::Error>>;
-    type ResponseFuture = Pin<Box<Future<Output = Result<Response, std::io::Error>> + Send>>;
-
-    fn connect(&self) -> Self::ConnectionFuture {
-        ok(())
-    }
-
-    fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let handler = Endpoint::new(test_route, auth_context);
-
-        async move { Ok((handler)(req).await) }.boxed()
-    }
-}
-
 fn main() {
-    let s = Server;
+    let router = {
+        let mut router = Router::new();
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me" => auth_context => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/"me"/user_id: i32 => auth_context => test_route),
+        );
+        router.add(
+            Method::POST,
+            route!(/"info"/node_id: u64 => auth_context => test_route),
+        );
+        router
+    };
 
-    http_service_hyper::run(
-        s,
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000),
-    );
+    Server::new(router).run()
 }
