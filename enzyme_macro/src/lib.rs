@@ -5,15 +5,23 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, Ident, LitStr, Result, Token, Type, punctuated::Punctuated};
+use syn::{parse_macro_input, Ident, LitInt, LitStr, Result, Token, Type, punctuated::Punctuated};
+
+trait LitIntExt {
+    fn from_usize(int: usize) -> LitInt {
+        LitInt::new(&format!("{}", int), Span::call_site())
+    }
+}
+
+impl LitIntExt for LitInt {}
 
 #[derive(Debug)]
 struct Route {
     pub context: Ident,
     pub handler: Ident,
     pub segments: Vec<Segment>,
-    pub static_segment_positions: Vec<usize>,
-    pub dynamic_segment_positions: Vec<usize>,
+    pub static_segment_positions: Vec<LitInt>,
+    pub dynamic_segment_positions: Vec<LitInt>,
 }
 
 #[derive(Debug)]
@@ -47,11 +55,11 @@ impl Parse for Route {
                 let lookahead = input.lookahead1();
                 if lookahead.peek(LitStr) {
                     segments.push(input.parse().map(Segment::Static)?);
-                    static_segment_positions.push(count);
+                    static_segment_positions.push(LitInt::from_usize(count));
                     count += 1;
                 } else if lookahead.peek(Ident) {
                     segments.push(input.parse().map(Segment::Dynamic)?);
-                    dynamic_segment_positions.push(count);
+                    dynamic_segment_positions.push(LitInt::from_usize(count));
                     count += 1;
                 } else if lookahead.peek(Token![/]) {
                     let _: Token![/] = input.parse()?;
@@ -101,22 +109,17 @@ impl Parse for DynamicSegment {
 }
 
 impl Route {
-    fn static_segments(&self) -> proc_macro2::TokenStream {
+    fn push_statements(&self) -> proc_macro2::TokenStream {
         let mut static_segments = vec![];
-        let mut static_positions = vec![];
-        let mut dynamic_positions = vec![];
         self.segments.iter().for_each(|segment| {
             if let Segment::Static(static_segment) = segment {
                 let content = &static_segment.content;
                 static_segments.push(quote!(#content));
             }
         });
-        self.static_segment_positions.iter().for_each(|pos| {
-            static_positions.push(quote!(#pos));
-        });
-        self.dynamic_segment_positions.iter().for_each(|pos| {
-            dynamic_positions.push(quote!(#pos));
-        });
+
+        let static_positions = &self.static_segment_positions;
+        let dynamic_positions = &self.dynamic_segment_positions;
 
         let static_segment_inserts = quote! {
             #(
@@ -147,7 +150,7 @@ impl Route {
 pub fn route(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Route);
 
-    let push_statements = input.static_segments();
+    let push_statements = input.push_statements();
     let route = input.handler;
     let context = input.context;
 

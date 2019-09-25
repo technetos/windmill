@@ -1,5 +1,6 @@
 use crate::router::Router;
 
+use hyper::{Client, client::HttpConnector};
 use futures::future::{ok, Future, Ready};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
@@ -10,6 +11,7 @@ use std::{
 };
 
 pub struct Server {
+    client: Client<HttpConnector>,
     router: Arc<Router>,
 }
 
@@ -30,6 +32,7 @@ impl HttpService for Server {
 impl Server {
     pub fn new(router: Router) -> Self {
         Self {
+            client: Client::default(),
             router: Arc::new(router),
         }
     }

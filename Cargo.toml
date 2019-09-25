@@ -17,6 +17,7 @@ tokio = "0.1.22"
 http-service = "0.3.1"
 http-service-hyper = "0.3.1"
 enzyme_macro = { path = "enzyme_macro" }
+hyper = { version = "0.13.0-alpha.2" }
 
 [[example]]
 name = "default_context"

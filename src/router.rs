@@ -42,7 +42,7 @@ impl Router {
             .push(route());
     }
 
-    pub fn lookup(
+    pub(crate) fn lookup(
         self: Arc<Self>,
         req: Request,
     ) -> Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>> {
