@@ -1,11 +1,5 @@
 #![feature(proc_macro_hygiene)]
-use enzyme::{
-    context::{default_context, Context},
-    macros::route,
-    result::WebResult,
-    router::Router,
-    server::Server,
-};
+use enzyme::{context::Context, macros::route, result::WebResult, router::Router, server::Server};
 
 use http::method::Method;
 use serde::{Deserialize, Serialize};
@@ -30,16 +24,13 @@ fn main() {
         let mut router = Router::new();
         router.add(
             Method::GET,
-            route!(/"users"/user_id: i32/"me" => default_context => test_route),
+            route!(/"users"/user_id: i32/"me" => test_route),
         );
         router.add(
             Method::GET,
-            route!(/"users"/"me"/user_id: i32 => default_context => test_route),
+            route!(/"users"/"me"/user_id: i32 => test_route),
         );
-        router.add(
-            Method::POST,
-            route!(/"info"/node_id: u64 => default_context => test_route),
-        );
+        router.add(Method::POST, route!(/"info"/node_id: u64 => test_route));
         router
     };
 

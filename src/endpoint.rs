@@ -1,7 +1,7 @@
-use crate::error::WebError;
+use crate::{context::FromParts, error::WebError};
 
 use futures::future::{Future, FutureExt};
-use http::{method::Method, request::Parts, StatusCode};
+use http::{method::Method, StatusCode};
 use http_service::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, pin::Pin};
@@ -12,16 +12,12 @@ pub(crate) type AsyncResponse =
 pub struct Endpoint;
 
 impl Endpoint {
-    pub fn new<Req, Res, Context, F, C>(
-        f: fn(Context, Req) -> F,
-        c: fn(Parts) -> C,
-    ) -> impl Fn(Request) -> AsyncResponse
+    pub fn new<Req, Res, Cx, F>(f: fn(Cx, Req) -> F) -> impl Fn(Request) -> AsyncResponse
     where
         Req: for<'de> Deserialize<'de> + Send + 'static + Default,
         Res: Serialize + 'static,
-        Context: Send + 'static,
+        Cx: FromParts + Send + 'static,
         F: Future<Output = Result<Res, WebError>> + Send + 'static,
-        C: Future<Output = Result<Context, WebError>> + Send + 'static,
     {
         move |req: Request| {
             let fut = async move {
@@ -30,7 +26,7 @@ impl Endpoint {
                 let has_body = parts.method != Method::GET;
 
                 // Await the evaluation of the context
-                let context = match c(parts).await {
+                let context = match Cx::from_parts(parts).await {
                     Ok(cx) => cx,
                     Err(e) => return error_response(e.msg, e.code),
                 };

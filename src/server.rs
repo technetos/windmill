@@ -1,9 +1,9 @@
 use crate::router::Router;
 
-use hyper::{Client, client::HttpConnector};
 use futures::future::{ok, Future, Ready};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
+use hyper::{client::HttpConnector, Client};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,

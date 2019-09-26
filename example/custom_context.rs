@@ -1,23 +1,23 @@
 #![feature(proc_macro_hygiene)]
 use enzyme::{
-    macros::route,
+    error::WebError,
+    macros::{route, FromParts},
     result::WebResult,
     router::Router,
     server::Server,
-    error::WebError,
 };
-
 use http::{method::Method, request::Parts, status::StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-struct CustomContext {
+#[derive(FromParts)]
+struct AuthContext {
     auth_token: String,
 }
 
-async fn auth_context(parts: Parts) -> WebResult<CustomContext> {
+async fn auth_context(parts: Parts) -> WebResult<AuthContext> {
     match parts.headers.get("authorization") {
-        Some(auth_token) => Ok(CustomContext {
+        Some(auth_token) => Ok(AuthContext {
             auth_token: auth_token.to_str().unwrap().to_string(),
         }),
         None => Err(WebError {
@@ -25,6 +25,17 @@ async fn auth_context(parts: Parts) -> WebResult<CustomContext> {
             code: StatusCode::UNAUTHORIZED,
         }),
     }
+}
+
+async fn test_route(cx: AuthContext, req: TestRequest) -> WebResult<TestResponse> {
+    Ok(TestResponse { success: true })
+}
+
+#[derive(FromParts)]
+struct SimpleContext;
+
+async fn simple_context(_parts: Parts) -> WebResult<SimpleContext> {
+    Ok(SimpleContext)
 }
 
 #[derive(Deserialize, Default)]
@@ -37,7 +48,7 @@ struct TestResponse {
     success: bool,
 }
 
-async fn test_route(cx: CustomContext, req: TestRequest) -> WebResult<TestResponse> {
+async fn test_route2(cx: SimpleContext, req: TestRequest) -> WebResult<TestResponse> {
     Ok(TestResponse { success: true })
 }
 
@@ -46,16 +57,9 @@ fn main() {
         let mut router = Router::new();
         router.add(
             Method::GET,
-            route!(/"users"/user_id: i32/"me" => auth_context => test_route),
+            route!(/"users"/user_id: i32/"me" => test_route),
         );
-        router.add(
-            Method::GET,
-            route!(/"users"/"me"/user_id: i32 => auth_context => test_route),
-        );
-        router.add(
-            Method::POST,
-            route!(/"info"/node_id: u64 => auth_context => test_route),
-        );
+        router.add(Method::POST, route!(/"info"/node_id: u64 => test_route2));
         router
     };
 
