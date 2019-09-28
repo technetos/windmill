@@ -1,7 +1,7 @@
 #![feature(proc_macro_hygiene)]
 use enzyme::{
     error::WebError,
-    macros::{route, FromParts},
+    macros::{route, Context},
     result::WebResult,
     router::Router,
     server::Server,
@@ -10,7 +10,17 @@ use http::{method::Method, request::Parts, status::StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(FromParts)]
+#[derive(Deserialize, Default)]
+struct TestRequest {
+    pub foo: String,
+}
+
+#[derive(Serialize)]
+struct TestResponse {
+    success: bool,
+}
+
+#[derive(Context)]
 struct AuthContext {
     auth_token: String,
 }
@@ -31,21 +41,11 @@ async fn test_route(cx: AuthContext, req: TestRequest) -> WebResult<TestResponse
     Ok(TestResponse { success: true })
 }
 
-#[derive(FromParts)]
+#[derive(Context)]
 struct SimpleContext;
 
 async fn simple_context(_parts: Parts) -> WebResult<SimpleContext> {
     Ok(SimpleContext)
-}
-
-#[derive(Deserialize, Default)]
-struct TestRequest {
-    pub foo: String,
-}
-
-#[derive(Serialize)]
-struct TestResponse {
-    success: bool,
 }
 
 async fn test_route2(cx: SimpleContext, req: TestRequest) -> WebResult<TestResponse> {
@@ -55,11 +55,32 @@ async fn test_route2(cx: SimpleContext, req: TestRequest) -> WebResult<TestRespo
 fn main() {
     let router = {
         let mut router = Router::new();
+
         router.add(
             Method::GET,
             route!(/"users"/user_id: i32/"me" => test_route),
         );
         router.add(Method::POST, route!(/"info"/node_id: u64 => test_route2));
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me2" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me3" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me4" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me5" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me6" => test_route),
+        );
         router
     };
 

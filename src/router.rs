@@ -58,6 +58,9 @@ impl Router {
         };
 
         if let Some(route) = maybe_route {
+            route.dynamic_segments.iter().for_each(|dynamic_segment| {
+                dbg!(&raw_route.raw_segments[dynamic_segment.position].value);
+            });
             return (route.handler)(req).boxed();
         }
 
@@ -65,7 +68,7 @@ impl Router {
     }
 }
 
-fn paths_match<'r>(route: &Route, raw_route: &RawRoute) -> bool {
+fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
     if raw_route.raw_segments.len() == route.static_segments.len() + route.dynamic_segments.len() {
         let static_matches = route
             .static_segments
@@ -99,25 +102,25 @@ async fn not_found() -> Result<Response, std::io::Error> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RawSegment {
-    value: String,
+pub(crate) struct RawSegment<'s> {
+    value: &'s str,
     position: usize,
 }
 
 #[derive(Debug)]
-pub(crate) struct RawRoute {
-    pub raw_segments: Vec<RawSegment>,
+pub(crate) struct RawRoute<'s> {
+    pub raw_segments: Vec<RawSegment<'s>>,
 }
 
-impl RawRoute {
-    pub(crate) fn from_path(path: String) -> Self {
+impl<'s> RawRoute<'s> {
+    pub(crate) fn from_path(path: &'s str) -> Self {
         let raw_segments = {
             let mut segments = vec![];
             let mut split = path.split("/");
             let _ = split.next(); // hack
             split.enumerate().for_each(|(i, segment)| {
                 segments.push(RawSegment {
-                    value: segment.into(),
+                    value: segment,
                     position: i,
                 });
             });
@@ -128,25 +131,25 @@ impl RawRoute {
     }
 }
 
-impl PartialEq<RawSegment> for StaticSegment {
+impl<'s> PartialEq<RawSegment<'s>> for StaticSegment {
     fn eq(&self, other: &RawSegment) -> bool {
         self.position == other.position && self.value == other.value
     }
 }
 
-impl PartialEq<RawSegment> for DynamicSegment {
+impl<'s> PartialEq<RawSegment<'s>> for DynamicSegment {
     fn eq(&self, other: &RawSegment) -> bool {
         self.position == other.position
     }
 }
 
-impl PartialEq<StaticSegment> for RawSegment {
+impl<'s> PartialEq<StaticSegment> for RawSegment<'s> {
     fn eq(&self, other: &StaticSegment) -> bool {
         other == self
     }
 }
 
-impl PartialEq<DynamicSegment> for RawSegment {
+impl<'s> PartialEq<DynamicSegment> for RawSegment<'s> {
     fn eq(&self, other: &DynamicSegment) -> bool {
         other == self
     }

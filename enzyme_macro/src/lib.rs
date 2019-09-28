@@ -176,16 +176,19 @@ impl IdentExt for Ident {
     }
 }
 
-#[proc_macro_derive(FromParts)]
-pub fn from_parts_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Context)]
+pub fn context_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = &input.ident;
     let context_func = &input.ident.as_snake_case();
 
     let tokens = quote! {
-        impl enzyme::context::FromParts for #name {
-            fn from_parts(parts: Parts) -> std::pin::Pin<Box<futures::future::Future<Output = WebResult<Self>> + Send>> {
+        impl enzyme::context::Context for #name {
+            fn from_parts(
+                parts: Parts
+            ) -> std::pin::Pin<Box<futures::future::Future<Output = WebResult<Self>> + Send>>
+            {
                 use futures::future::FutureExt;
                 async move { #context_func(parts).await }.boxed()
             }
