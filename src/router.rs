@@ -15,6 +15,7 @@ pub struct StaticSegment {
 
 #[derive(Debug)]
 pub struct DynamicSegment {
+    pub name: &'static str,
     pub position: usize,
 }
 
@@ -58,9 +59,18 @@ impl Router {
         };
 
         if let Some(route) = maybe_route {
-            route.dynamic_segments.iter().for_each(|dynamic_segment| {
-                dbg!(&raw_route.raw_segments[dynamic_segment.position].value);
-            });
+            let params = route.dynamic_segments.iter().fold(
+                HashMap::new(),
+                |mut params, dynamic_segment| {
+                    params.insert(
+                        dynamic_segment.name,
+                        &raw_route.raw_segments[dynamic_segment.position].value,
+                    );
+                    params
+                },
+            );
+            dbg!(params);
+
             return (route.handler)(req).boxed();
         }
 

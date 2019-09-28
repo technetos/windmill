@@ -40,7 +40,6 @@ struct StaticSegment {
 #[derive(Debug)]
 struct DynamicSegment {
     pub field_name: Ident,
-    pub ty: Type,
 }
 
 impl Parse for Route {
@@ -97,20 +96,26 @@ impl Parse for StaticSegment {
 impl Parse for DynamicSegment {
     fn parse(input: ParseStream) -> Result<Self> {
         let field_name = input.parse()?;
-        let _: Token![:] = input.parse()?;
-        let ty = input.parse()?;
 
-        Ok(Self { field_name, ty })
+        Ok(Self { field_name })
     }
 }
 
 impl Route {
     fn push_statements(&self) -> proc_macro2::TokenStream {
         let mut static_segments = vec![];
+        let mut dynamic_segment_names = vec![];
+
         self.segments.iter().for_each(|segment| {
-            if let Segment::Static(static_segment) = segment {
-                let content = &static_segment.content;
-                static_segments.push(quote!(#content));
+            match segment {
+                Segment::Static(static_segment) => {
+                    let content = &static_segment.content;
+                    static_segments.push(quote!(#content));
+                }
+                Segment::Dynamic(dynamic_segment) => {
+                    let name = &dynamic_segment.field_name.to_string();
+                    dynamic_segment_names.push(quote!(#name));
+                }
             }
         });
 
@@ -129,6 +134,7 @@ impl Route {
         let dynamic_segment_inserts = quote! {
             #(
                 dynamic_segments.push(enzyme::router::DynamicSegment {
+                    name: #dynamic_segment_names,
                     position: #dynamic_positions,
                 });
             )*

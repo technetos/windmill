@@ -41,46 +41,16 @@ async fn test_route(cx: AuthContext, req: TestRequest) -> WebResult<TestResponse
     Ok(TestResponse { success: true })
 }
 
-#[derive(Context)]
-struct SimpleContext;
-
-async fn simple_context(_parts: Parts) -> WebResult<SimpleContext> {
-    Ok(SimpleContext)
-}
-
-async fn test_route2(cx: SimpleContext, req: TestRequest) -> WebResult<TestResponse> {
-    Ok(TestResponse { success: true })
-}
-
 fn main() {
     let router = {
         let mut router = Router::new();
 
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me" => test_route),
-        );
-        router.add(Method::POST, route!(/"info"/node_id: u64 => test_route2));
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me2" => test_route),
-        );
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me3" => test_route),
-        );
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me4" => test_route),
-        );
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me5" => test_route),
-        );
-        router.add(
-            Method::GET,
-            route!(/"users"/user_id: i32/"me6" => test_route),
-        );
+        router.add(Method::GET, route!(/"users"/user_id/"me" => test_route));
+        router.add(Method::GET, route!(/"users"/user_id/"me2" => test_route));
+        router.add(Method::GET, route!(/"users"/user_id/"me3" => test_route));
+        router.add(Method::GET, route!(/"users"/user_id/"me4" => test_route));
+        router.add(Method::GET, route!(/"users"/user_id/"me5" => test_route));
+        router.add(Method::GET, route!(/"users"/user_id/"me6" => test_route));
         router
     };
 
