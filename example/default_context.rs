@@ -1,14 +1,7 @@
-use enzyme::context::default_context;
-use enzyme::prelude::*;
+#![feature(proc_macro_hygiene)]
+use enzyme::{context::Context, macros::route, result::WebResult, router::Router, server::Server};
 
-use futures::future::{ok, Future, FutureExt, Ready};
-use http_service::{HttpService, Request, Response};
-use http_service_hyper;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    pin::Pin,
-};
-
+use http::method::Method;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Default)]
@@ -22,32 +15,24 @@ struct TestResponse {
 }
 
 async fn test_route(cx: Context, req: TestRequest) -> WebResult<TestResponse> {
+    println!("req.foo: {}", &req.foo);
     Ok(TestResponse { success: true })
 }
 
-pub struct Server;
-
-impl HttpService for Server {
-    type Connection = ();
-    type ConnectionFuture = Ready<Result<(), std::io::Error>>;
-    type ResponseFuture = Pin<Box<Future<Output = Result<Response, std::io::Error>> + Send>>;
-
-    fn connect(&self) -> Self::ConnectionFuture {
-        ok(())
-    }
-
-    fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let handler = Endpoint::new(test_route, default_context);
-
-        async move { Ok((handler)(req).await) }.boxed()
-    }
-}
-
 fn main() {
-    let s = Server;
+    let router = {
+        let mut router = Router::new();
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/"me"/user_id: i32 => test_route),
+        );
+        router.add(Method::POST, route!(/"info"/node_id: u64 => test_route));
+        router
+    };
 
-    http_service_hyper::run(
-        s,
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000),
-    );
+    Server::new(router).run()
 }

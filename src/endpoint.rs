@@ -1,26 +1,23 @@
-use crate::error::WebError;
+use crate::{context::Context, error::WebError};
 
 use futures::future::{Future, FutureExt};
-use http::{method::Method, request::Parts, StatusCode};
+use http::{method::Method, StatusCode};
 use http_service::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, pin::Pin};
 
-pub(crate) type AsyncResponse = Pin<Box<dyn Future<Output = Response> + Send>>;
+pub(crate) type AsyncResponse =
+    Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>>;
 
 pub struct Endpoint;
 
 impl Endpoint {
-    pub fn new<Req, Res, Context, F, C>(
-        f: fn(Context, Req) -> F,
-        c: fn(Parts) -> C,
-    ) -> impl Fn(Request) -> AsyncResponse
+    pub fn new<Req, Res, Ctx, F>(f: fn(Ctx, Req) -> F) -> impl Fn(Request) -> AsyncResponse
     where
         Req: for<'de> Deserialize<'de> + Send + 'static + Default,
         Res: Serialize + 'static,
-        Context: Send + 'static,
+        Ctx: Context + Send + 'static,
         F: Future<Output = Result<Res, WebError>> + Send + 'static,
-        C: Future<Output = Result<Context, WebError>> + Send + 'static,
     {
         move |req: Request| {
             let fut = async move {
@@ -29,8 +26,8 @@ impl Endpoint {
                 let has_body = parts.method != Method::GET;
 
                 // Await the evaluation of the context
-                let context = match c(parts).await {
-                    Ok(cx) => cx,
+                let context = match Ctx::from_parts(parts).await {
+                    Ok(ctx) => ctx,
                     Err(e) => return error_response(e.msg, e.code),
                 };
 
@@ -66,16 +63,19 @@ impl Endpoint {
     }
 }
 
-fn error_response(msg: impl Serialize, code: http::StatusCode) -> Response {
+pub(crate) fn error_response(
+    msg: impl Serialize,
+    code: http::StatusCode,
+) -> Result<Response, std::io::Error> {
     let mut res = into_response(msg);
     *res.status_mut() = code;
-    res
+    Ok(res)
 }
 
-fn success_response(msg: impl Serialize) -> Response {
+fn success_response(msg: impl Serialize) -> Result<Response, std::io::Error> {
     let mut res = into_response(msg);
     *res.status_mut() = StatusCode::OK;
-    res
+    Ok(res)
 }
 
 fn into_response(msg: impl Serialize) -> Response {

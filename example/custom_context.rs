@@ -1,32 +1,14 @@
-use enzyme::prelude::*;
-
-use futures::future::{ok, Future, FutureExt, Ready};
-use http::{request::Parts, status::StatusCode};
-use http_service::{HttpService, Request, Response};
-use http_service_hyper;
-use serde_json::json;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    pin::Pin,
+#![feature(proc_macro_hygiene)]
+use enzyme::{
+    error::WebError,
+    macros::{route, Context},
+    result::WebResult,
+    router::Router,
+    server::Server,
 };
-
+use http::{method::Method, request::Parts, status::StatusCode};
 use serde::{Deserialize, Serialize};
-
-struct CustomContext {
-    auth_token: String,
-}
-
-async fn auth_context(parts: Parts) -> WebResult<CustomContext> {
-    match parts.headers.get("authorization") {
-        Some(auth_token) => Ok(CustomContext {
-            auth_token: auth_token.to_str().unwrap().to_string(),
-        }),
-        None => Err(WebError {
-            msg: json!("Unauthorized"),
-            code: StatusCode::UNAUTHORIZED,
-        }),
-    }
-}
+use serde_json::json;
 
 #[derive(Deserialize, Default)]
 struct TestRequest {
@@ -38,33 +20,69 @@ struct TestResponse {
     success: bool,
 }
 
-async fn test_route(cx: CustomContext, req: TestRequest) -> WebResult<TestResponse> {
+#[derive(Context)]
+struct AuthContext {
+    auth_token: String,
+}
+
+async fn auth_context(parts: Parts) -> WebResult<AuthContext> {
+    match parts.headers.get("authorization") {
+        Some(auth_token) => Ok(AuthContext {
+            auth_token: auth_token.to_str().unwrap().to_string(),
+        }),
+        None => Err(WebError {
+            msg: json!("Unauthorized"),
+            code: StatusCode::UNAUTHORIZED,
+        }),
+    }
+}
+
+async fn test_route(cx: AuthContext, req: TestRequest) -> WebResult<TestResponse> {
     Ok(TestResponse { success: true })
 }
 
-pub struct Server;
+#[derive(Context)]
+struct SimpleContext;
 
-impl HttpService for Server {
-    type Connection = ();
-    type ConnectionFuture = Ready<Result<(), std::io::Error>>;
-    type ResponseFuture = Pin<Box<Future<Output = Result<Response, std::io::Error>> + Send>>;
+async fn simple_context(_parts: Parts) -> WebResult<SimpleContext> {
+    Ok(SimpleContext)
+}
 
-    fn connect(&self) -> Self::ConnectionFuture {
-        ok(())
-    }
-
-    fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {
-        let handler = Endpoint::new(test_route, auth_context);
-
-        async move { Ok((handler)(req).await) }.boxed()
-    }
+async fn test_route2(cx: SimpleContext, req: TestRequest) -> WebResult<TestResponse> {
+    Ok(TestResponse { success: true })
 }
 
 fn main() {
-    let s = Server;
+    let router = {
+        let mut router = Router::new();
 
-    http_service_hyper::run(
-        s,
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000),
-    );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me" => test_route),
+        );
+        router.add(Method::POST, route!(/"info"/node_id: u64 => test_route2));
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me2" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me3" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me4" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me5" => test_route),
+        );
+        router.add(
+            Method::GET,
+            route!(/"users"/user_id: i32/"me6" => test_route),
+        );
+        router
+    };
+
+    Server::new(router).run()
 }

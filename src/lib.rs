@@ -1,12 +1,14 @@
 pub mod context;
 pub mod endpoint;
 pub mod error;
+pub mod router;
+pub mod server;
 
-pub type WebResult<T> = Result<T, error::WebError>;
+pub mod macros {
+    pub use enzyme_macro::route;
+    pub use enzyme_macro::Context;
+}
 
-pub mod prelude {
-    pub use super::context::Context;
-    pub use super::endpoint::Endpoint;
-    pub use super::error::WebError;
-    pub use super::WebResult;
+pub mod result {
+    pub type WebResult<T> = Result<T, crate::error::WebError>;
 }

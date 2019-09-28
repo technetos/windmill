@@ -1,10 +1,8 @@
-use crate::WebResult;
+use crate::result::WebResult;
+use futures::future::{Future, FutureExt};
 use http::request::Parts;
+use std::pin::Pin;
 
-pub struct Context {
-    parts: Parts,
-}
-
-pub async fn default_context(parts: Parts) -> WebResult<Context> {
-    Ok(Context { parts })
+pub trait Context: Sized {
+    fn from_parts(_: Parts) -> Pin<Box<dyn Future<Output = WebResult<Self>> + Send>>;
 }
