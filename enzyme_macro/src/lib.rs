@@ -192,11 +192,12 @@ pub fn context_derive(input: TokenStream) -> TokenStream {
     let tokens = quote! {
         impl enzyme::context::Context for #name {
             fn from_parts(
-                parts: Parts
+                parts: Parts,
+                params: Params,
             ) -> std::pin::Pin<Box<futures::future::Future<Output = WebResult<Self>> + Send>>
             {
                 use futures::future::FutureExt;
-                async move { #context_func(parts).await }.boxed()
+                async move { #context_func(parts, params).await }.boxed()
             }
         }
     };

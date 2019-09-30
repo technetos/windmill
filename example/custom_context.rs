@@ -2,6 +2,7 @@
 use enzyme::{
     error::WebError,
     macros::{route, Context},
+    params::Params,
     result::WebResult,
     router::Router,
     server::Server,
@@ -25,7 +26,8 @@ struct AuthContext {
     auth_token: String,
 }
 
-async fn auth_context(parts: Parts) -> WebResult<AuthContext> {
+async fn auth_context(parts: Parts, params: Params) -> WebResult<AuthContext> {
+    dbg!(params);
     match parts.headers.get("authorization") {
         Some(auth_token) => Ok(AuthContext {
             auth_token: auth_token.to_str().unwrap().to_string(),
