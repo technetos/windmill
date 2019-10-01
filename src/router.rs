@@ -1,11 +1,11 @@
-use crate::endpoint::AsyncResponse;
+use crate::{endpoint::AsyncResponse, params::Params};
 use futures::future::{Future, FutureExt};
 use http::method::Method;
 use http_service::{Request, Response};
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
 
-pub(crate) type RouteFn = Box<dyn Fn(Request) -> AsyncResponse + Send + Sync>;
+pub(crate) type RouteFn = Box<dyn Fn(Request, Params) -> AsyncResponse + Send + Sync>;
 
 #[derive(Debug)]
 pub struct StaticSegment {
@@ -15,6 +15,7 @@ pub struct StaticSegment {
 
 #[derive(Debug)]
 pub struct DynamicSegment {
+    pub name: &'static str,
     pub position: usize,
 }
 
@@ -58,10 +59,20 @@ impl Router {
         };
 
         if let Some(route) = maybe_route {
-            route.dynamic_segments.iter().for_each(|dynamic_segment| {
-                dbg!(&raw_route.raw_segments[dynamic_segment.position].value);
-            });
-            return (route.handler)(req).boxed();
+            let params = route.dynamic_segments.iter().fold(
+                HashMap::new(),
+                |mut params, dynamic_segment| {
+                    params.insert(
+                        dynamic_segment.name,
+                        raw_route.raw_segments[dynamic_segment.position]
+                            .value
+                            .to_string(),
+                    );
+                    params
+                },
+            );
+
+            return (route.handler)(req, params).boxed();
         }
 
         not_found().boxed()

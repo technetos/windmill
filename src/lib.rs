@@ -12,3 +12,7 @@ pub mod macros {
 pub mod result {
     pub type WebResult<T> = Result<T, crate::error::WebError>;
 }
+
+pub mod params {
+    pub type Params = std::collections::HashMap<&'static str, String>;
+}
