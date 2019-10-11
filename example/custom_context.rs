@@ -1,4 +1,8 @@
 #![feature(proc_macro_hygiene)]
+
+#[macro_use]
+extern crate lazy_static;
+
 use enzyme::{
     error::WebError,
     macros::{route, Context},
@@ -17,8 +21,8 @@ struct TestRequest {
 }
 
 #[derive(Serialize)]
-struct TestResponse {
-    success: bool,
+struct TestResponse<'s> {
+    success: &'s str,
 }
 
 #[derive(Context)]
@@ -27,7 +31,6 @@ struct AuthContext {
 }
 
 async fn auth_context(parts: Parts, params: Params) -> WebResult<AuthContext> {
-    dbg!(params);
     match parts.headers.get("authorization") {
         Some(auth_token) => Ok(AuthContext {
             auth_token: auth_token.to_str().unwrap().to_string(),
@@ -39,20 +42,33 @@ async fn auth_context(parts: Parts, params: Params) -> WebResult<AuthContext> {
     }
 }
 
-async fn test_route(cx: AuthContext, req: TestRequest) -> WebResult<TestResponse> {
-    Ok(TestResponse { success: true })
+struct TestEndpoint {
+    msg: String,
+}
+
+impl TestEndpoint {
+    pub async fn test(
+        &self,
+        cx: AuthContext,
+        req: TestRequest,
+    ) -> WebResult<TestResponse<'_>> {
+        Ok(TestResponse { success: &self.msg })
+    }
+}
+
+lazy_static! {
+    static ref TEST_SERVICE: TestEndpoint = TestEndpoint {
+        msg: "Hello".into(),
+    };
 }
 
 fn main() {
+    let test_route = |cx: AuthContext, req: TestRequest| TEST_SERVICE.test(cx, req);
+
     let router = {
         let mut router = Router::new();
 
         router.add(Method::GET, route!(/"users"/user_id/"me" => test_route));
-        router.add(Method::GET, route!(/"users"/user_id/"me2" => test_route));
-        router.add(Method::GET, route!(/"users"/user_id/"me3" => test_route));
-        router.add(Method::GET, route!(/"users"/user_id/"me4" => test_route));
-        router.add(Method::GET, route!(/"users"/user_id/"me5" => test_route));
-        router.add(Method::GET, route!(/"users"/user_id/"me6" => test_route));
         router
     };
 

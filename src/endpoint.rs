@@ -12,7 +12,9 @@ pub(crate) type AsyncResponse =
 pub struct Endpoint;
 
 impl Endpoint {
-    pub fn new<Req, Res, Ctx, F>(f: fn(Ctx, Req) -> F) -> impl Fn(Request, Params) -> AsyncResponse
+    pub fn new<Req, Res, Ctx, F>(
+        f: impl Fn(Ctx, Req) -> F + Send + Sync + Copy + 'static,
+    ) -> impl Fn(Request, Params) -> AsyncResponse
     where
         Req: for<'de> Deserialize<'de> + Send + 'static + Default,
         Res: Serialize + 'static,
