@@ -1,5 +1,7 @@
+use crate::user::User;
+
 lazy_static! {
-    static ref USER_SERVICE: User = User {
-        msg: "Hello".into(),
+    pub(crate) static ref USER_SERVICE: User = User {
+        database: "foo".into()
     };
 }

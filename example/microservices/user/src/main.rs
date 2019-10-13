@@ -3,21 +3,20 @@
 #[macro_use]
 extern crate lazy_static;
 
-use enzyme::{
-    error::WebError,
-    macros::{route, Context},
-    params::Params,
-    result::WebResult,
-    router::Router,
-    server::Server,
-};
-use http::{method::Method, request::Parts, status::StatusCode};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+mod message;
+mod service;
+mod user;
+
+use message::{LogoutRequest, TokenRequest};
+use service::USER_SERVICE;
+use user::{AuthContext, TokenContext};
+
+use enzyme::{macros::route, router::Router, server::Server};
+use http::method::Method;
 
 fn main() {
-    let token = |cx: TokenContext, req: TokenRequest| USER.token(cx, req);
-    let logout = |cx: AuthContext, req: LogoutRequest| USER.logout(cx, req);
+    let token = |cx: TokenContext, req: TokenRequest| USER_SERVICE.token(cx, req);
+    let logout = |cx: AuthContext, req: LogoutRequest| USER_SERVICE.logout(cx, req);
 
     let router = {
         let mut router = Router::new();
