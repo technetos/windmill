@@ -6,10 +6,11 @@ extern crate lazy_static;
 mod message;
 mod service;
 mod user;
+mod context;
 
 use message::{LogoutRequest, TokenRequest};
 use service::USER_SERVICE;
-use user::{AuthContext, TokenContext};
+use context::{AuthContext, TokenContext};
 
 use enzyme::{macros::route, router::Router, server::Server};
 use http::method::Method;
