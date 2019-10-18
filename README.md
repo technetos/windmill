@@ -2,7 +2,26 @@
 
 A bare bones http web framework that stays out of your way.  
 
+## Routing
+
+Routing is done through the `Router` type.  The `Router` has a `new` method to
+construct an instance and an `.add` method to add routes to the router.  
+
+The `route!` macro is used to generate a route from a path and a service proxy.
+A service proxy is a closure with the signature `|cx: Context, req: Request|
+SERVICE_INSTANCE.service_endpoint(cx, req)`.  The `route!` macro is used as
+follows:
+```rust
+route!(/"path"/param/"path"/"path"/param => service_proxy)
+```
+Where `"path"` is a static segment that must be matched verbatim and `param` is
+a parameter that is captured and made available through the `Param` type in the
+context function.  
+
 ## Endpoint
+
+`Endpoint` is entirely internal to enzyme and a user will never need to interact
+with it directly.  Nonetheless it is good to know how it works.  
 
 An endpoint is an async function from `Request` to `Response`.  An endpoint is
 created using `Endpoint::new` taking an async route function and an async context
