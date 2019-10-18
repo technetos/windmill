@@ -23,9 +23,13 @@ impl Endpoint {
     {
         move |req: Request, params: Params| {
             let fut = async move {
-                let (parts, body) = req.into_parts();
+                let has_body = req
+                    .headers()
+                    .get("content-length")
+                    .map(|content_length| content_length.as_bytes() != b"0")
+                    .unwrap_or_else(|| false);
 
-                let has_body = parts.method != Method::GET;
+                let (parts, body) = req.into_parts();
 
                 // Await the evaluation of the context
                 let context = match Ctx::from_parts(parts, params).await {
