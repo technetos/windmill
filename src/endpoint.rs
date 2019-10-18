@@ -1,7 +1,7 @@
 use crate::{context::Context, error::WebError, params::Params};
 
 use futures::future::{Future, FutureExt};
-use http::{method::Method, StatusCode};
+use http::StatusCode;
 use http_service::{Request, Response};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, pin::Pin};
