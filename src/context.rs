@@ -1,8 +1,8 @@
 use crate::{params::Params, result::WebResult};
-use futures::future::Future;
 use http::request::Parts;
-use std::pin::Pin;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait Context: Sized {
-    fn from_parts(_: Parts, _: Params) -> Pin<Box<dyn Future<Output = WebResult<Self>> + Send>>;
+    async fn from_parts<'a>(_: Parts, _: Params) -> WebResult<Self>;
 }

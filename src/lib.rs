@@ -6,7 +6,6 @@ pub mod server;
 
 pub mod macros {
     pub use enzyme_macro::route;
-    pub use enzyme_macro::Context;
 }
 
 pub mod result {

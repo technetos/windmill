@@ -1,13 +1,11 @@
 extern crate proc_macro;
 
-use heck::{CamelCase, SnakeCase};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    parse_macro_input, punctuated::Punctuated, DeriveInput, Ident, LitInt, LitStr, Result, Token,
-    Type,
+    parse_macro_input, Ident, LitInt, LitStr, Result, Token,
 };
 
 trait LitIntExt {
@@ -170,37 +168,4 @@ pub fn route(tokens: TokenStream) -> TokenStream {
     };
 
     output.into()
-}
-
-trait IdentExt {
-    fn as_snake_case(&self) -> Ident;
-}
-
-impl IdentExt for Ident {
-    fn as_snake_case(&self) -> Ident {
-        Ident::new(&self.to_string().to_snake_case(), self.span())
-    }
-}
-
-#[proc_macro_derive(Context)]
-pub fn context_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-
-    let name = &input.ident;
-    let context_func = &input.ident.as_snake_case();
-
-    let tokens = quote! {
-        impl enzyme::context::Context for #name {
-            fn from_parts(
-                parts: Parts,
-                params: Params,
-            ) -> std::pin::Pin<Box<futures::future::Future<Output = WebResult<Self>> + Send>>
-            {
-                use futures::future::FutureExt;
-                async move { #context_func(parts, params).await }.boxed()
-            }
-        }
-    };
-
-    tokens.into()
 }
