@@ -16,7 +16,7 @@ route!(/"path"/param/"path"/"path"/param => service_proxy)
 ```
 Where `"path"` is a static segment that must be matched verbatim and `param` is
 a parameter that is captured and made available through the `Param` type in the
-context function.  
+`from_parts` method in the `Context` trait.  
 
 ## Endpoint
 
@@ -24,10 +24,9 @@ context function.
 with it directly.  Nonetheless it is good to know how it works.  
 
 An endpoint is an async function from `Request` to `Response`.  An endpoint is
-created using `Endpoint::new` taking an async route function and an async context
-function as parameters.  The returned endpoint is a function that takes in a
-`Request` and evaluates the route and context functions as steps in the request
-evaluation.  
+created using `Endpoint::new` taking a service proxy as an argument.  The
+returned endpoint is a function that takes in a `Request` and evaluates the
+service proxy as steps in the request evaluation.  
 
 ### Request and Response Types
 
@@ -44,18 +43,17 @@ automatically deserialized and serialized, you just define routes that consume
 your `RequestType` and return your `ResponseType` and the framework does the
 rest.  
 
+The `Content-Length` header is required in any requests containing a body that
+you wish to be automatically deserialized.  A `Content-Length` of 0 will prevent
+deserialization of the body entirely.   
+
 ### Context Types
 
-`ContextType` can be any type, the async context function is used to construct
-the `ContextType` and must have the following signature:
-
-```rust
-async fn(Parts) -> WebResult<ContextType>
-```
-
-`Parts` is the `http::request::Parts` type from the `http` crate and contains
-everything in the request except the body.   An example `ContextType` could have
-members such as `auth_token` and the async context function that constructs it
+`ContextType` can be any type that implements the `Context` trait.  The
+`from_parts` method is used to construct the `ContextType` from `Parts` and
+`Params`.  `Parts` is the `http::request::Parts` type from the `http` crate and
+contains everything in the request except the body.   An example `ContextType`
+could have members such as `auth_token` and the implementation of `from_parts`
 could parse out and evaluate the `auth_token` for validity before returning the
 `ContextType`.  Finally access to the context of the request is accomplished by
 passing the `ContextType` into the async route function.  

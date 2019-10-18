@@ -17,11 +17,3 @@ enzyme_macro = { path = "enzyme_macro" }
 hyper = { version = "0.13.0-alpha.2" }
 lazy_static = "1.4.0"    
 async-trait = "0.1.15"
-
-[[example]]
-name = "default_context"
-path = "example/default_context.rs"
-
-[[example]]
-name = "custom_context"
-path = "example/custom_context.rs"
