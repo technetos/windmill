@@ -54,12 +54,9 @@ async fn(Parts) -> WebResult<ContextType>
 ```
 
 `Parts` is the `http::request::Parts` type from the `http` crate and contains
-everything in the request except the body.  The framework provides a default
-context type and a default context type function called `Context` and
-`default_context` respectively.  The default `Context` type simply wraps the
-`Parts` type as a member.  A more elaborate `ContextType` could have members
-such as `auth_token` and the async context function that constructs it could
-parse out and evaluate the `auth_token` for validity before returning the
+everything in the request except the body.   An example `ContextType` could have
+members such as `auth_token` and the async context function that constructs it
+could parse out and evaluate the `auth_token` for validity before returning the
 `ContextType`.  Finally access to the context of the request is accomplished by
 passing the `ContextType` into the async route function.  
 
