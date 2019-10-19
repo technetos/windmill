@@ -1,6 +1,6 @@
 use crate::{params::Params, result::WebResult};
-use http::request::Parts;
 use async_trait::async_trait;
+use http::request::Parts;
 
 #[async_trait]
 pub trait Context: Sized {
