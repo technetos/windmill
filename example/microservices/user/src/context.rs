@@ -1,7 +1,7 @@
-use enzyme::{error::WebError, params::Params, context::Context, result::WebResult};
-use serde_json::json;
-use http::{request::Parts, status::StatusCode};
 use async_trait::async_trait;
+use enzyme::{context::Context, error::WebError, params::Params, result::WebResult};
+use http::{request::Parts, status::StatusCode};
+use serde_json::json;
 
 pub(crate) struct TokenContext;
 

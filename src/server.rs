@@ -4,10 +4,26 @@ use futures::future::{ok, Future, Ready};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     sync::Arc,
 };
+
+pub struct Config {
+    sock_addr: SocketAddr,
+}
+
+impl Config {
+    pub fn new(addr: &str) -> Result<Self, AddrParseError> {
+        Ok(Self {
+            sock_addr: addr.parse()?,
+        })
+    }
+
+    fn into_socket_addr(self) -> SocketAddr {
+        self.sock_addr
+    }
+}
 
 pub struct Server {
     router: Arc<Router>,
@@ -34,10 +50,7 @@ impl Server {
         }
     }
 
-    pub fn run(self) {
-        http_service_hyper::run(
-            self,
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000),
-        );
+    pub fn run(self, config: Config) {
+        http_service_hyper::run(self, config.into_socket_addr());
     }
 }
