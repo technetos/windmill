@@ -66,7 +66,7 @@ impl Router {
                         dynamic_segment.name,
                         raw_route.raw_segments[dynamic_segment.position]
                             .value
-                            .to_string(),
+                            .into(),
                     );
                     params
                 },

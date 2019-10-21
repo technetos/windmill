@@ -16,7 +16,7 @@ impl User {
         })
     }
 
-    pub async fn logout(&self, cx: AuthContext, req: LogoutRequest) -> WebResult<LogoutResponse> {
+    pub async fn logout(&self, cx: AuthContext, _: LogoutRequest) -> WebResult<LogoutResponse> {
         if &cx.user_token == "12345" {
             Ok(LogoutResponse)
         } else {

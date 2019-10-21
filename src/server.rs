@@ -4,7 +4,7 @@ use futures::future::{ok, Future, Ready};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
 use std::{
-    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
+    net::{AddrParseError, SocketAddr},
     pin::Pin,
     sync::Arc,
 };
