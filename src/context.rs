@@ -4,5 +4,5 @@ use http::request::Parts;
 
 #[async_trait]
 pub trait Context: Sized {
-    async fn from_parts<'a>(_: Parts, _: Params) -> WebResult<Self>;
+    async fn from_parts(_: Parts, _: Params) -> WebResult<Self>;
 }
