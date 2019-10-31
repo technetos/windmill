@@ -3,7 +3,7 @@ use enzyme::{context::Context, error::WebError, params::Params, result::WebResul
 use http::{request::Parts, status::StatusCode};
 use serde_json::json;
 
-pub(crate) struct TokenContext;
+pub struct TokenContext;
 
 #[async_trait]
 impl Context for TokenContext {
@@ -12,8 +12,8 @@ impl Context for TokenContext {
     }
 }
 
-pub(crate) struct AuthContext {
-    pub(crate) user_token: String,
+pub struct AuthContext {
+    pub user_token: String,
 }
 
 #[async_trait]

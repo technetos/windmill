@@ -6,11 +6,10 @@ use enzyme::{error::WebError, result::WebResult};
 use http::status::StatusCode;
 use serde_json::json;
 
-pub(crate) struct User;
+pub struct User;
 
 impl User {
-    pub async fn token(&self, _: TokenContext, req: TokenRequest) -> WebResult<TokenResponse<'_>> {
-        dbg!(req.username);
+    pub async fn token(&self, _: TokenContext, _: TokenRequest) -> WebResult<TokenResponse<'_>> {
         Ok(TokenResponse {
             user_token: "12345",
         })
