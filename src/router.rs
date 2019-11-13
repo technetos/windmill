@@ -1,7 +1,7 @@
 use crate::{endpoint::AsyncResponse, params::Params};
-use futures::future::{Future, FutureExt};
 use http::method::Method;
 use http_service::{Request, Response};
+use std::future::Future;
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
 
@@ -55,7 +55,7 @@ impl Router {
                 .filter(|route| paths_match(route, &raw_route))
                 .nth(0)
         } else {
-            return not_found().boxed();
+            return Box::pin(not_found());
         };
 
         if let Some(route) = maybe_route {
@@ -72,10 +72,10 @@ impl Router {
                 },
             );
 
-            return (route.handler)(req, params).boxed();
+            return Box::pin((route.handler)(req, params));
         }
 
-        not_found().boxed()
+        Box::pin(not_found())
     }
 }
 
@@ -125,20 +125,17 @@ pub(crate) struct RawRoute<'s> {
 
 impl<'s> RawRoute<'s> {
     pub(crate) fn from_path(path: &'s str) -> Self {
-        let raw_segments = {
-            let mut segments = vec![];
-            let mut split = path.split("/");
-            let _ = split.next(); // hack
-            split.enumerate().for_each(|(i, segment)| {
-                segments.push(RawSegment {
+        Self {
+            raw_segments: path
+                .split("/")
+                .skip(1)
+                .enumerate()
+                .map(|(i, segment)| RawSegment {
                     value: segment,
                     position: i,
-                });
-            });
-            segments
-        };
-
-        Self { raw_segments }
+                })
+                .collect(),
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 use crate::router::Router;
 
-use futures::future::{ok, Future, Ready};
 use http_service::{HttpService, Request, Response};
 use http_service_hyper;
+use std::future::Future;
 use std::{
     net::{AddrParseError, SocketAddr},
     pin::Pin,
@@ -31,11 +31,11 @@ pub struct Server {
 
 impl HttpService for Server {
     type Connection = ();
-    type ConnectionFuture = Ready<Result<(), std::io::Error>>;
+    type ConnectionFuture = crate::ready::Ready<Result<(), std::io::Error>>;
     type ResponseFuture = Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>>;
 
     fn connect(&self) -> Self::ConnectionFuture {
-        ok(())
+        crate::ready::ready(Ok(()))
     }
 
     fn respond(&self, _conn: &mut (), req: Request) -> Self::ResponseFuture {

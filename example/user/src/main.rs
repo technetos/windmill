@@ -22,12 +22,14 @@ use http::method::Method;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token = |cx: TokenContext, req: TokenRequest| USER_SERVICE.token(cx, req);
     let logout = |cx: AuthContext, req: LogoutRequest| USER_SERVICE.logout(cx, req);
+    let example = |cx: TokenContext, req: LogoutRequest| async { Ok(message::LogoutResponse) };
 
     let router = {
         let mut router = Router::new();
 
         router.add(Method::POST, route!(/"token" => token));
         router.add(Method::POST, route!(/"logout" => logout));
+        router.add(Method::GET, route!(/"example" => example));
         router
     };
 

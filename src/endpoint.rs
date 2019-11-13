@@ -1,9 +1,9 @@
-use crate::{context::Context, error::WebError, params::Params};
+use crate::{context::Context, params::Params, result::WebResult};
 
-use futures::future::{Future, FutureExt};
 use http::StatusCode;
 use http_service::{Request, Response};
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::{error::Error, pin::Pin};
 
 pub(crate) type AsyncResponse =
@@ -19,7 +19,7 @@ impl Endpoint {
         Req: for<'de> Deserialize<'de> + Send + 'static + Default,
         Res: Serialize + 'static,
         Ctx: Context + Send + 'static,
-        F: Future<Output = Result<Res, WebError>> + Send + 'static,
+        F: Future<Output = WebResult<Res>> + Send + 'static,
     {
         move |req: Request, params: Params| {
             let fut = async move {
@@ -64,7 +64,7 @@ impl Endpoint {
                 }
             };
 
-            fut.boxed()
+            Box::pin(fut)
         }
     }
 }
