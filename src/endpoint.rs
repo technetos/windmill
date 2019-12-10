@@ -1,7 +1,7 @@
 use crate::{context::Context, params::Params, result::WebResult};
 
-use http::StatusCode;
-use http_service::{Request, Response};
+use async_std::prelude::*;
+use http_types::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::{error::Error, pin::Pin};
@@ -29,28 +29,23 @@ impl Endpoint {
                     .map(|content_length| content_length.as_bytes() != b"0")
                     .unwrap_or_else(|| false);
 
-                let (parts, body) = req.into_parts();
+                let headers = req.headers();
+
+                let mut body = vec![];
+                req.read_to_end(&mut body).await?;
 
                 // Await the evaluation of the context
-                let context = match Ctx::from_parts(parts, params).await {
+                let context = match Ctx::from_parts(headers, params).await {
                     Ok(ctx) => ctx,
                     Err(e) => return error_response(e.msg, e.code),
                 };
 
-                // Wait to receive the body bytes
-                let body_bytes = match body.into_vec().await {
-                    Ok(bytes) => bytes,
-                    Err(e) => {
-                        return error_response(e.description(), StatusCode::INTERNAL_SERVER_ERROR)
-                    }
-                };
-
                 // Parse the body as json if the request has a body
                 let req = if has_body {
-                    match serde_json::from_slice(&body_bytes) {
+                    match serde_json::from_slice(&body) {
                         Ok(req) => req,
                         Err(e) => {
-                            return error_response(format!("{}", e), StatusCode::BAD_REQUEST);
+                            return error_response(format!("{}", e), StatusCode::BadRequest);
                         }
                     }
                 } else {
@@ -71,7 +66,7 @@ impl Endpoint {
 
 pub(crate) fn error_response(
     msg: impl Serialize,
-    code: http::StatusCode,
+    code: StatusCode,
 ) -> Result<Response, std::io::Error> {
     let mut res = into_response(msg);
     *res.status_mut() = code;

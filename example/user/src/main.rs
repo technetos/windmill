@@ -5,12 +5,11 @@ extern crate lazy_static;
 
 mod context;
 mod message;
-mod service;
 mod user;
 
 use context::{AuthContext, TokenContext};
 use message::{LogoutRequest, TokenRequest};
-use service::USER_SERVICE;
+use user::{token, logout};
 
 use enzyme::{
     macros::route,
@@ -20,8 +19,6 @@ use enzyme::{
 use http::method::Method;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let token = |cx: TokenContext, req: TokenRequest| USER_SERVICE.token(cx, req);
-    let logout = |cx: AuthContext, req: LogoutRequest| USER_SERVICE.logout(cx, req);
     let example = |cx: TokenContext, req: LogoutRequest| async { Ok(message::LogoutResponse) };
 
     let router = {
@@ -33,6 +30,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         router
     };
 
-    let config = Config::new("127.0.0.1:3000")?;
+    let config = Config::new("127.0.0.1:4000")?;
     Ok(Server::new(router).run(config))
 }

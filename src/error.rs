@@ -1,4 +1,4 @@
-use http::StatusCode;
+use http_types::StatusCode;
 
 pub struct WebError {
     pub code: StatusCode,

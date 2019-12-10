@@ -1,6 +1,5 @@
 use crate::{endpoint::AsyncResponse, params::Params};
-use http::method::Method;
-use http_service::{Request, Response};
+use http_types::{Method, Request, Response, StatusCode};
 use std::future::Future;
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
@@ -45,7 +44,7 @@ impl Router {
 
     pub(crate) fn lookup(
         self: Arc<Self>,
-        req: Request,
+        req: &mut Request,
     ) -> Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send>> {
         let method = req.method();
         let raw_route = RawRoute::from_path(req.uri().path().into());
@@ -106,10 +105,9 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 
 async fn not_found() -> Result<Response, std::io::Error> {
     use crate::endpoint::error_response;
-    use http::status::StatusCode;
     use serde_json::json;
 
-    error_response(json!("not found"), StatusCode::NOT_FOUND)
+    error_response(json!("not found"), StatusCode::NotFound)
 }
 
 #[derive(Debug)]
