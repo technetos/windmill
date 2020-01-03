@@ -1,21 +1,18 @@
 use crate::router::Router;
 
-use async_std::prelude::*;
-use async_std::net::{self, TcpStream};
-use async_std::task::{self, Context, Poll};
-use async_std::io::{self, Read, Write};
 use async_h1::Exception;
+use async_std::io::{self, Read, Write};
+use async_std::net::{self, TcpStream};
+use async_std::prelude::*;
+use async_std::task::{self, Context, Poll};
 
 use http_types::{Request, Response};
 use std::future::Future;
-use std::{
-    pin::Pin,
-    sync::Arc,
-};
+use std::{pin::Pin, sync::Arc};
 
-pub struct Config {
-    sock_addr: SocketAddr,
-}
+//pub struct Config {
+//    sock_addr: SocketAddr,
+//}
 
 //impl Config {
 //    pub fn new(addr: &str) -> Result<Self, Exception> {
@@ -40,41 +37,40 @@ impl Server {
         }
     }
 
-    pub fn run(self, config: Config) -> Result<(), Exception> {
+    pub fn run(self) -> Result<(), Exception> {
         task::block_on(async {
-            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
-            let addr = format!("http://{}", listener.local_addr()?);
-            println!("listening on {}", addr);
-            let mut incoming = listener.incoming();
-
-            while let Some(stream) = incoming.next().await {
-                let stream = stream?;
-                let addr = addr.clone();
-                task::spawn(async {
-                    if let Err(err) = accept(addr, stream, self.router.clone()).await {
-                        eprintln!("{}", err);
-                    }
-                });
-            }
+            //            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
+            //            let addr = format!("http://{}", listener.local_addr()?);
+            //            println!("listening on {}", addr);
+            //            let mut incoming = listener.incoming();
+            //
+            //            while let Some(stream) = incoming.next().await {
+            //                let stream = stream?;
+            //                let addr = addr.clone();
+            //                task::spawn(async {
+            //                    if let Err(err) = accept(addr, stream, self.router.clone()).await {
+            //                        eprintln!("{}", err);
+            //                    }
+            //                });
+            //            }
+            //            Ok(())
+            //        });
+            //        Ok(())
+            //    }
             Ok(())
-        });
-        Ok(())
+        })
     }
 }
 
-async fn accept(
-    addr: String,
-    stream: TcpStream,
-    router: Arc<Router>,
-) -> Result<(), Exception> {
+async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Exception> {
     // println!("starting new connection from {}", stream.peer_addr()?);
 
     // TODO: Delete this line when we implement `Clone` for `TcpStream`.
     let stream = Stream(Arc::new(stream));
 
-    async_h1::server::accept(&addr, stream.clone(), stream, |req| {
+    async_h1::server::accept(&addr, stream, |req| {
         async {
-            let response = router.clone().lookup(&mut req).await?;
+            let response = router.clone().lookup(req).await;
             Ok(response)
             //            let resp = Response::new(StatusCode::Ok)
             //                .set_header("Content-Type", "text/plain")?

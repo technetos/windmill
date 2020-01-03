@@ -162,7 +162,7 @@ pub fn route(tokens: TokenStream) -> TokenStream {
             enzyme::router::Route {
                 static_segments,
                 dynamic_segments,
-                handler: Box::new(enzyme::endpoint::Endpoint::new(#route)),
+                handler: #route,
             }
         }
     };

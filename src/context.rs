@@ -1,8 +1,11 @@
 use crate::{params::Params, result::WebResult};
 use async_trait::async_trait;
-use http_types::Headers;
+use http_types::Request;
+use std::future::Future;
 
-#[async_trait]
 pub trait Context: Sized {
-    async fn from_parts(_: &Headers, _: Params) -> WebResult<Self>;
+    fn from_parts(
+        _: &Request,
+        _: Params,
+    ) -> Box<Future<Output = WebResult<Self>> + Unpin + Send + Sync>;
 }

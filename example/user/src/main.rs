@@ -9,7 +9,7 @@ mod user;
 
 use context::{AuthContext, TokenContext};
 use message::{LogoutRequest, TokenRequest};
-use user::{token, logout};
+use user::{logout, token};
 
 use enzyme::{
     macros::route,
