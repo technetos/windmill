@@ -7,7 +7,6 @@ mod context;
 mod message;
 mod user;
 
-use context::{AuthContext, TokenContext};
 use message::{LogoutRequest, TokenRequest};
 use user::{logout, token};
 
@@ -24,9 +23,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = {
         let mut router = Router::new();
 
-        router.add(Method::POST, route!(/"token" => token));
-        router.add(Method::POST, route!(/"logout" => logout));
-        router.add(Method::GET, route!(/"example" => example));
+        router.add(Method::POST, route!(/"token")).mount(token);
+        router.add(Method::POST, route!(/"logout")).mount(logout);
+        router.add(Method::GET, route!(/"example")).mount(example);
         router
     };
 

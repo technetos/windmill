@@ -9,56 +9,51 @@ use std::{error::Error, pin::Pin, str::FromStr};
 pub(crate) type AsyncResponse =
     Pin<Box<dyn Future<Output = Result<Response, std::io::Error>> + Send + Sync>>;
 
-pub struct Endpoint;
+pub fn service_endpoint<Req, Res, Ctx, F>(
+    f: impl Fn(Ctx, Req) -> F + Send + Copy + 'static,
+) -> Pin<Box<Fn(Request, Params) -> AsyncResponse>>
+where
+    Req: for<'de> Deserialize<'de> + Send + 'static + Default,
+    Res: Serialize + Send + 'static,
+    Ctx: Context + Send + 'static,
+    F: Future<Output = WebResult<Res>> + Send + 'static + Sync,
+{
+    Box::pin(move |req: Request, params: Params| {
+        Box::pin(async {
+            let has_body = req
+                .header(&headers::CONTENT_LENGTH)
+                .map(|values| values.first().map(|value| value.as_str() == "0"))
+                .flatten()
+                .unwrap_or_else(|| false);
 
-impl Endpoint {
-    pub fn new<Req, Res, Ctx, F>(
-        f: impl Fn(Ctx, Req) -> F + Send + Copy + 'static + Sync
-    ) -> impl Fn(Request, Params) -> AsyncResponse + Send + Sync
-    where
-        Req: for<'de> Deserialize<'de> + Send + Sync + 'static + Default,
-        Res: Serialize + Send + Sync + 'static,
-        Ctx: Context + Send + Sync + 'static,
-        F: Future<Output = WebResult<Res>> + Send + Sync + 'static,
-    {
-        move |req: Request, params: Params| {
-            let fut = async move {
-                let has_body = req
-                    .header(&headers::CONTENT_LENGTH)
-                    .map(|values| values.first().map(|value| value.as_str() == "0"))
-                    .flatten()
-                    .unwrap_or_else(|| false);
+            let mut body = vec![];
+            req.read_to_end(&mut body).await?;
 
-                let mut body = vec![];
-                req.read_to_end(&mut body).await?;
-
-                // Await the evaluation of the context
-                let context = match Ctx::from_parts(&req, params).await {
-                    Ok(ctx) => ctx,
-                    Err(e) => return error_response(e.msg, e.code),
-                };
-
-                // Parse the body as json if the request has a body
-                let req = if has_body {
-                    match serde_json::from_slice(&body) {
-                        Ok(req) => req,
-                        Err(e) => {
-                            return error_response(format!("{}", e), StatusCode::BadRequest);
-                        }
-                    }
-                } else {
-                    Req::default()
-                };
-
-                // Await the evaluation of the endpoint handler
-                match f(context, req).await {
-                    Ok(res) => success_response(res),
-                    Err(e) => error_response(e.msg, e.code),
-                }
+            // Await the evaluation of the context
+            let context = match Ctx::from_parts(&req, params).await {
+                Ok(ctx) => ctx,
+                Err(e) => return error_response(e.msg, e.code),
             };
-            Box::pin(fut)
-        }
-    }
+
+            // Parse the body as json if the request has a body
+            let req = if has_body {
+                match serde_json::from_slice(&body) {
+                    Ok(req) => req,
+                    Err(e) => {
+                        return error_response(format!("{}", e), StatusCode::BadRequest);
+                    }
+                }
+            } else {
+                Req::default()
+            };
+
+            // Await the evaluation of the endpoint handler
+            match f(context, req).await {
+                Ok(res) => success_response(res),
+                Err(e) => error_response(e.msg, e.code),
+            }
+        })
+    })
 }
 
 pub(crate) fn error_response(

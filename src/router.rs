@@ -7,18 +7,11 @@ use std::future::Future;
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
 
-pub trait Endpoint: Send + Sync + Copy + 'static {
-    fn call<Req: for<'de> Deserialize<'de> + Send, Res: Serialize>(
-        &self,
-        req: Req,
-        params: Params,
-    ) -> BoxFuture<'static, Res>;
-}
 
-pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-pub(crate) type DynEndpoint =
-    dyn (Fn(Request, Params) -> BoxFuture<'static, Response>) + 'static + Send + Sync;
+
+
+
 
 #[derive(Debug)]
 pub struct StaticSegment {
@@ -35,47 +28,52 @@ pub struct DynamicSegment {
 pub struct Route {
     pub static_segments: Vec<StaticSegment>,
     pub dynamic_segments: Vec<DynamicSegment>,
-    pub handler: Option<Box<DynEndpoint>>,
+    pub handler: Option<Box<Fn(Request, Params) -> Pin<Box<Future<Output = Response>>>>>,
+}
+
+#[test]
+fn test() {
+    type Result<T> = std::result::Result<T, Response>;
+    use serde::{Deserialize, Serialize};
+    use crate::macros::route;
+
+    let mut router = Arc::new(Router::new());
+
+    #[derive(Deserialize, Default)]
+    struct ExampleRequest {
+        image_orientation: String,
+    }
+
+    #[derive(Serialize)]
+    struct ExampleResponse;
+
+
+    async fn example_route(req: ExampleRequest, params: Params) -> Result<ExampleResponse> {
+        use std::str::FromStr;
+
+        let id = match u64::from_str(params.get("image_id").unwrap_or_else(|| &String::new())) {
+            Ok(id) => id,
+            Err(_) => return Err(Response::new(StatusCode::BadRequest)),
+        };
+
+        Ok(ExampleResponse)
+    }
+
+    let get_images = route!(/"images"/image_id);
+
+    router.add(Method::Get, get_images, example_route);
+
+
+
+
+//        let req = parse_body::<GetImagesById>(req).await;
+//
+
+
+
 }
 
 use async_std::prelude::*;
-impl Route {
-    fn mount<Req, Res>(&mut self, endpoint: impl Endpoint)
-    where
-        Req: for<'de> Deserialize<'de> + Default + Send,
-        Res: Serialize + Send,
-    {
-        self.handler = Some(Box::new(move |mut req, params| {
-            let fut = async move {
-                let has_body = req
-                    .header(&headers::CONTENT_LENGTH)
-                    .map(|values| values.first().map(|value| value.as_str() == "0"))
-                    .flatten()
-                    .unwrap_or_else(|| false);
-
-                let mut body = vec![];
-                req.read_to_end(&mut body).await.unwrap();
-
-                // Parse the body as json if the request has a body
-                let decoded_req = if has_body {
-                    match serde_json::from_slice(&body) {
-                        Ok(req) => req,
-                        Err(e) => {
-                            return error_response(format!("{}", e), StatusCode::BadRequest);
-                        }
-                    }
-                } else {
-                    Req::default()
-                };
-
-                // Await the evaluation of the endpoint handler
-                let res: Res = endpoint.call(decoded_req, params).await;
-                success_response(res)
-            };
-            Box::pin(fut)
-        }));
-    }
-}
 
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
@@ -88,11 +86,44 @@ impl Router {
         }
     }
 
-    pub fn add(&mut self, method: Method, route: impl Fn() -> Route) {
-        self.table
+    pub fn add<Req, Res>(
+        &mut self,
+        method: Method,
+        mut route: Route,
+        endpoint: fn(Req, Params) -> Pin<Box<Future<Output = Res>>>,
+    ) where
+        Req: for<'de> Deserialize<'de> + 'static,
+        Res: Serialize + 'static,
+    {
+        let entry = self
+            .table
             .entry(method)
-            .or_insert_with(|| vec![route()])
-            .push(route());
+            .or_insert_with(|| Vec::<Route>::new());
+
+        let handler = move |mut req: Request, params: Params| -> Pin<Box<Future<Output = Response>>> {
+            let fut = async move {
+                let has_body = req
+                    .header(&headers::CONTENT_LENGTH)
+                    .map(|values| values.first().map(|value| value.as_str() == "0"))
+                    .flatten()
+                    .unwrap_or_else(|| false);
+
+                if has_body {
+                    let mut body = vec![];
+                    req.read_to_end(&mut body).await.unwrap();
+
+                    let req: Req = serde_json::from_slice(&body).unwrap();
+
+                    let res: Res = endpoint(req, params).await;
+                }
+
+                Response::new(StatusCode::NotFound)
+            };
+            Box::pin(fut)
+        };
+
+        route.handler = Some(Box::new(handler));
+        entry.push(route);
     }
 
     pub(crate) fn lookup(
@@ -123,9 +154,9 @@ impl Router {
                     params
                 },
             );
-
+            
             return Box::new((route.handler.as_ref().unwrap())(req, params));
-        }
+        };
 
         Box::new(Box::pin(not_found()))
     }
@@ -158,7 +189,9 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 async fn not_found() -> Response {
     use serde_json::json;
 
-    error_response(json!("not found"), StatusCode::NotFound)
+    let mut res = Response::new(StatusCode::NotFound);
+    res.set_body(serde_json::to_vec(&json!("not found")).unwrap());
+    res
 }
 
 #[derive(Debug)]

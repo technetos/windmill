@@ -39,6 +39,13 @@ impl Server {
 
     pub fn run(self) -> Result<(), Exception> {
         task::block_on(async {
+            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
+            let addr = format!("http://{}", listener.local_addr()?);
+            println!("listening on {}", addr);
+
+            let mut incoming = listener.incoming();
+
+            while let Some(stream) = incoming.next().await {}
             //            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
             //            let addr = format!("http://{}", listener.local_addr()?);
             //            println!("listening on {}", addr);
