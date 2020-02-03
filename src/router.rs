@@ -9,20 +9,20 @@ use std::{collections::HashMap, pin::Pin};
 
 #[derive(Debug)]
 pub struct StaticSegment {
-    pub value: &'static str,
-    pub position: usize,
+    value: &'static str,
+    position: usize,
 }
 
 #[derive(Debug)]
 pub struct DynamicSegment {
-    pub name: &'static str,
-    pub position: usize,
+    name: &'static str,
+    position: usize,
 }
 
 pub struct Route {
-    pub static_segments: Vec<StaticSegment>,
-    pub dynamic_segments: Vec<DynamicSegment>,
-    pub handler: Option<Box<dyn Fn(Request, Params) -> Pin<Box<dyn Future<Output = Response>>>>>,
+    static_segments: Vec<StaticSegment>,
+    dynamic_segments: Vec<DynamicSegment>,
+    handler: Option<Box<dyn Fn(Request, Params) -> Pin<Box<dyn Future<Output = Response>>>>>,
 }
 
 pub struct Router {
@@ -137,10 +137,12 @@ impl Router {
                 },
             );
 
-            return Box::new((route.handler.as_ref().unwrap())(req, params));
-        };
+            Box::new((route.handler.as_ref().unwrap())(req, params))
+        } else {
+            Box::new(Box::pin(not_found()))
+        }
 
-        Box::new(Box::pin(not_found()))
+
     }
 }
 
