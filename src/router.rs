@@ -7,13 +7,11 @@ use std::future::Future;
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
 
-#[derive(Debug)]
 pub struct StaticSegment {
     value: &'static str,
     position: usize,
 }
 
-#[derive(Debug)]
 pub struct DynamicSegment {
     name: &'static str,
     position: usize,
@@ -29,23 +27,29 @@ pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
 
-pub trait Endpoint<Req, Res>: 'static + Copy
+pub trait HttpStatusCode {
+    fn code(&self) -> StatusCode;
+}
+
+pub trait Endpoint<Error, Req, Res>: 'static + Copy
 where
+    Error: HttpStatusCode + 'static,
     Req: for<'de> Deserialize<'de> + 'static,
     Res: Serialize + 'static,
 {
-    type Fut: Future<Output = Res>;
+    type Fut: Future<Output = Result<Res, Error>>;
     fn call(&self, req: Req, params: Params) -> Self::Fut;
 }
 
-impl<Req, Res, F, G> Endpoint<Req, Res> for F
+impl<Error, Req, Res, F, G> Endpoint<Error, Req, Res> for F
 where
+    Error: HttpStatusCode + 'static,
     Req: for<'de> Deserialize<'de> + 'static,
     Res: Serialize + 'static,
-    G: Future<Output = Res> + 'static,
+    G: Future<Output = Result<Res, Error>> + 'static,
     F: Fn(Req, Params) -> G + 'static + Copy,
 {
-    type Fut = Pin<Box<Future<Output = Res>>>;
+    type Fut = Pin<Box<Future<Output = Result<Res, Error>>>>;
     fn call(&self, req: Req, params: Params) -> Self::Fut {
         let fut = (self)(req, params);
         Box::pin(async move { fut.await })
@@ -59,14 +63,15 @@ impl Router {
         }
     }
 
-    pub fn add<Req, Res>(
+    pub fn add<Error, Req, Res>(
         &mut self,
         method: Method,
         mut route: Route,
-        endpoint: impl Endpoint<Req, Res>,
+        endpoint: impl Endpoint<Error, Req, Res>,
     ) where
+        Error: HttpStatusCode + 'static,
         Req: for<'de> Deserialize<'de> + Default + 'static,
-        Res: Serialize + 'static,
+        Res: Serialize + 'static + Default,
     {
         let entry = self
             .table
@@ -93,7 +98,10 @@ impl Router {
                         Req::default()
                     };
 
-                    let res: Res = endpoint.call(req, params).await;
+                    let res: Res = match endpoint.call(req, params).await {
+                        Ok(body) => body,
+                        Err(e) => return Response::new(e.code()),
+                    };
 
                     let res_bytes = serde_json::to_vec(&res).unwrap();
                     let mut res = Response::new(StatusCode::Ok);
@@ -141,8 +149,33 @@ impl Router {
         } else {
             Box::new(Box::pin(not_found()))
         }
+    }
+}
 
+fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
+    if raw_route.raw_segments.len() == route.static_segments.len() + route.dynamic_segments.len() {
+        let static_matches = || {
+            route
+                .static_segments
+                .iter()
+                .fold(true, |is_match, static_segment| {
+                    is_match && (&raw_route.raw_segments[static_segment.position] == static_segment)
+                })
+        };
 
+        let dynamic_matches = || {
+            route
+                .dynamic_segments
+                .iter()
+                .fold(true, |is_match, dynamic_segment| {
+                    is_match
+                        && (&raw_route.raw_segments[dynamic_segment.position] == dynamic_segment)
+                })
+        };
+
+        static_matches() && dynamic_matches()
+    } else {
+        false
     }
 }
 
@@ -154,37 +187,11 @@ async fn not_found() -> Response {
     res
 }
 
-fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
-    if raw_route.raw_segments.len() == route.static_segments.len() + route.dynamic_segments.len() {
-        let static_matches = route
-            .static_segments
-            .iter()
-            .fold(true, |is_match, static_segment| {
-                is_match && (&raw_route.raw_segments[static_segment.position] == static_segment)
-            });
-
-        let dynamic_matches =
-            route
-                .dynamic_segments
-                .iter()
-                .fold(true, |is_match, dynamic_segment| {
-                    is_match
-                        && (&raw_route.raw_segments[dynamic_segment.position] == dynamic_segment)
-                });
-
-        static_matches && dynamic_matches
-    } else {
-        false
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct RawSegment<'s> {
     value: &'s str,
     position: usize,
 }
 
-#[derive(Debug)]
 pub(crate) struct RawRoute<'s> {
     pub raw_segments: Vec<RawSegment<'s>>,
 }
@@ -229,23 +236,20 @@ impl<'s> PartialEq<DynamicSegment> for RawSegment<'s> {
     }
 }
 
-pub(crate) fn error_response(msg: impl Serialize, code: StatusCode) -> Response {
-    let mut res = Response::new(code);
-    res.set_body(serde_json::to_vec(&msg).unwrap());
-    res
-}
-
-fn success_response(msg: impl Serialize) -> Response {
-    let mut res = Response::new(StatusCode::Ok);
-    res.set_body(serde_json::to_vec(&msg).unwrap());
-    res
-}
-
 #[test]
 fn test() {
-    type Result<T> = std::result::Result<T, Response>;
     use crate::macros::route;
     use serde::{Deserialize, Serialize};
+
+    pub struct Error {
+        code: StatusCode,
+    }
+
+    impl HttpStatusCode for Error {
+        fn code(&self) -> StatusCode {
+            self.code
+        }
+    }
 
     let mut router = Router::new();
 
@@ -254,29 +258,25 @@ fn test() {
         image_orientation: String,
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Default)]
     struct ExampleResponse;
 
-    async fn example_route(req: ExampleRequest, params: Params) -> ExampleResponse {
-        ExampleResponse
+    async fn example_route(req: ExampleRequest, params: Params) -> Result<ExampleResponse, Error> {
+        Ok(ExampleResponse)
     }
 
     #[derive(Deserialize, Default)]
     struct ExampleRequest2;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Default)]
     struct ExampleResponse2;
 
-    async fn another_route(req: ExampleRequest2, params: Params) -> ExampleResponse2 {
-        ExampleResponse2
+    async fn another_route(req: ExampleRequest2, params: Params) -> Result<ExampleResponse2, Error> {
+        Err(Error {
+            code: StatusCode::Unauthorized,
+        })
     }
-
-    let get_images = route!(/"images"/image_id);
-    let example2 = route!(/"foo");
-
-    router.add(Method::Get, get_images, example_route);
-    router.add(Method::Get, example2, another_route);
-
-    //        let req = parse_body::<GetImagesById>(req).await;
-    //
+    
+    router.add(Method::Get, route!(/"images"/image_id), example_route);
+    router.add(Method::Get, route!(/"foo"), another_route);
 }
