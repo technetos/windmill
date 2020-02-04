@@ -89,23 +89,32 @@ impl Router {
                         .flatten()
                         .unwrap_or_else(|| false);
 
-                    let req: Req = if has_body {
+                    let req_body: Req = if has_body {
                         let mut body = vec![];
-                        req.read_to_end(&mut body).await.unwrap();
+                        if let Err(_) = req.read_to_end(&mut body).await {
+                            return Response::new(StatusCode::BadRequest);
+                        }
 
-                        serde_json::from_slice(&body).unwrap()
+                        match serde_json::from_slice(&body) {
+                            Ok(res_body) => res_body,
+                            Err(_) => return Response::new(StatusCode::BadRequest),
+                        }
                     } else {
                         Req::default()
                     };
 
-                    let res: Res = match endpoint.call(req, params).await {
-                        Ok(body) => body,
+                    let res_body: Res = match endpoint.call(req_body, params).await {
+                        Ok(res_body) => res_body,
                         Err(e) => return Response::new(e.code()),
                     };
 
-                    let res_bytes = serde_json::to_vec(&res).unwrap();
+                    let res_body_bytes = match serde_json::to_vec(&res_body) {
+                        Ok(res_body_bytes) => res_body_bytes,
+                        Err(_) => return Response::new(StatusCode::InternalServerError),
+                    };
+
                     let mut res = Response::new(StatusCode::Ok);
-                    res.set_body(res_bytes);
+                    res.set_body(res_body_bytes);
 
                     res
                 };
@@ -180,10 +189,7 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 }
 
 async fn not_found() -> Response {
-    use serde_json::json;
-
     let mut res = Response::new(StatusCode::NotFound);
-    res.set_body(serde_json::to_vec(&json!("not found")).unwrap());
     res
 }
 
