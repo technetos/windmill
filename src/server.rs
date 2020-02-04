@@ -1,12 +1,11 @@
 use crate::router::Router;
 
-use async_h1::Exception;
 use async_std::io::{self, Read, Write};
 use async_std::net::{self, TcpStream};
 use async_std::prelude::*;
 use async_std::task::{self, Context, Poll};
 
-use http_types::{Request, Response};
+use http_types::{Error, Request, Response};
 use std::future::Future;
 use std::{pin::Pin, sync::Arc};
 
@@ -15,7 +14,7 @@ use std::{pin::Pin, sync::Arc};
 //}
 
 //impl Config {
-//    pub fn new(addr: &str) -> Result<Self, Exception> {
+//    pub fn new(addr: &str) -> Result<Self, Error> {
 //        Ok(Self {
 //            sock_addr: addr.parse()?,
 //        })
@@ -37,7 +36,7 @@ impl Server {
         }
     }
 
-    pub fn run(self) -> Result<(), Exception> {
+    pub fn run(self) -> Result<(), Error> {
         task::block_on(async {
             let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
             let addr = format!("http://{}", listener.local_addr()?);
@@ -69,7 +68,7 @@ impl Server {
     }
 }
 
-async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Exception> {
+async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Error> {
     // println!("starting new connection from {}", stream.peer_addr()?);
 
     // TODO: Delete this line when we implement `Clone` for `TcpStream`.
