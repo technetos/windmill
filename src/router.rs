@@ -1,59 +1,31 @@
-use crate::context::Context;
 use crate::params::Params;
-use crate::result::WebResult;
-use http_types::{headers, Method, Request, Response, StatusCode};
+use crate::{Endpoint, HttpError, Req};
+use http_types::{headers, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::sync::Arc;
 use std::{collections::HashMap, pin::Pin};
 
+type ResponseFuture = Pin<Box<dyn Future<Output = http_types::Response> + Send + Sync>>;
+
 pub struct StaticSegment {
-    value: &'static str,
-    position: usize,
+    pub value: &'static str,
+    pub position: usize,
 }
 
 pub struct DynamicSegment {
-    name: &'static str,
-    position: usize,
+    pub name: &'static str,
+    pub position: usize,
 }
 
 pub struct Route {
-    static_segments: Vec<StaticSegment>,
-    dynamic_segments: Vec<DynamicSegment>,
-    handler: Option<Box<dyn Fn(Request, Params) -> Pin<Box<dyn Future<Output = Response>>>>>,
+    pub static_segments: Vec<StaticSegment>,
+    pub dynamic_segments: Vec<DynamicSegment>,
+    pub handler: Option<Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>>,
 }
 
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
-}
-
-pub trait HttpStatusCode {
-    fn code(&self) -> StatusCode;
-}
-
-pub trait Endpoint<Error, Req, Res>: 'static + Copy
-where
-    Error: HttpStatusCode + 'static,
-    Req: for<'de> Deserialize<'de> + 'static,
-    Res: Serialize + 'static,
-{
-    type Fut: Future<Output = Result<Res, Error>>;
-    fn call(&self, req: Req, params: Params) -> Self::Fut;
-}
-
-impl<Error, Req, Res, F, G> Endpoint<Error, Req, Res> for F
-where
-    Error: HttpStatusCode + 'static,
-    Req: for<'de> Deserialize<'de> + 'static,
-    Res: Serialize + 'static,
-    G: Future<Output = Result<Res, Error>> + 'static,
-    F: Fn(Req, Params) -> G + 'static + Copy,
-{
-    type Fut = Pin<Box<Future<Output = Result<Res, Error>>>>;
-    fn call(&self, req: Req, params: Params) -> Self::Fut {
-        let fut = (self)(req, params);
-        Box::pin(async move { fut.await })
-    }
 }
 
 impl Router {
@@ -63,72 +35,86 @@ impl Router {
         }
     }
 
-    pub fn add<Error, Req, Res>(
+    pub fn add<Error, Body, Res>(
         &mut self,
         method: Method,
         mut route: Route,
-        endpoint: impl Endpoint<Error, Req, Res>,
+        endpoint: impl Endpoint<Error, Body, Res> + Send + Sync,
     ) where
-        Error: HttpStatusCode + 'static,
-        Req: for<'de> Deserialize<'de> + Default + 'static,
-        Res: Serialize + 'static + Default,
+        Error: HttpError + 'static + Send + Sync,
+        Body: for<'de> Deserialize<'de> + Default + 'static + Send + Sync,
+        Res: Serialize + 'static + Send + Sync,
     {
         let entry = self
             .table
             .entry(method)
             .or_insert_with(|| Vec::<Route>::new());
 
-        let handler =
-            move |mut req: Request, params: Params| -> Pin<Box<dyn Future<Output = Response>>> {
-                use async_std::prelude::*;
+        let handler = move |mut req: http_types::Request, params: Params| -> ResponseFuture {
+            use async_std::prelude::*;
 
-                let fut = async move {
-                    let has_body = req
-                        .header(&headers::CONTENT_LENGTH)
-                        .map(|values| values.first().map(|value| value.as_str() == "0"))
-                        .flatten()
-                        .unwrap_or_else(|| false);
+            let fut = async move {
+                let has_body = req
+                    .header(&headers::CONTENT_LENGTH)
+                    .map(|values| values.first().map(|value| value.as_str() == "0"))
+                    .flatten()
+                    .unwrap_or_else(|| false);
 
-                    let req_body: Req = if has_body {
-                        let mut body = vec![];
-                        if let Err(_) = req.read_to_end(&mut body).await {
-                            return Response::new(StatusCode::BadRequest);
-                        }
+                let req_body: Body = if has_body {
+                    let mut body = vec![];
+                    if let Err(_) = req.read_to_end(&mut body).await {
+                        return http_types::Response::new(StatusCode::BadRequest);
+                    }
 
-                        match serde_json::from_slice(&body) {
-                            Ok(res_body) => res_body,
-                            Err(_) => return Response::new(StatusCode::BadRequest),
-                        }
-                    } else {
-                        Req::default()
-                    };
-
-                    let res_body: Res = match endpoint.call(req_body, params).await {
+                    match serde_json::from_slice(&body) {
                         Ok(res_body) => res_body,
-                        Err(e) => return Response::new(e.code()),
-                    };
-
-                    let res_body_bytes = match serde_json::to_vec(&res_body) {
-                        Ok(res_body_bytes) => res_body_bytes,
-                        Err(_) => return Response::new(StatusCode::InternalServerError),
-                    };
-
-                    let mut res = Response::new(StatusCode::Ok);
-                    res.set_body(res_body_bytes);
-
-                    res
+                        Err(_) => return http_types::Response::new(StatusCode::BadRequest),
+                    }
+                } else {
+                    Body::default()
                 };
-                Box::pin(fut)
+
+                let res_body: Res = match endpoint.call(Req::new(req, req_body, params)).await {
+                    Ok(res_body) => res_body,
+                    Err(e) => {
+                        let mut res = http_types::Response::new(e.code());
+                        res.set_body(serde_json::to_vec(e.msg()).unwrap());
+                        let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+                        return res;
+                    }
+                };
+
+                let res_body_bytes = match serde_json::to_vec(&res_body) {
+                    Ok(res_body_bytes) => res_body_bytes,
+                    Err(e) => {
+                        let mut res = http_types::Response::new(StatusCode::InternalServerError);
+                        let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+                        res.set_body(
+                            serde_json::to_vec(&serde_json::json!({
+                                "error": format!("{}", e),
+                            }))
+                            .unwrap(),
+                        );
+                        return res;
+                    }
+                };
+
+                let mut res = http_types::Response::new(StatusCode::Ok);
+                res.set_body(res_body_bytes);
+                let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+                res
             };
+            Box::pin(fut)
+        };
 
         route.handler = Some(Box::new(handler));
         entry.push(route);
     }
 
-    pub(crate) fn lookup(
+    pub(crate) async fn lookup(
         self: Arc<Self>,
-        req: Request,
-    ) -> Box<dyn Future<Output = Response> + Unpin> {
+        req: http_types::Request,
+    ) -> Box<dyn Future<Output = http_types::Response> + Unpin + Send + Sync> {
         let method = req.method();
         let raw_route = RawRoute::from_path(req.url().path().into());
         let maybe_route = if let Some(routes) = self.table.get(&method) {
@@ -188,9 +174,8 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
     }
 }
 
-async fn not_found() -> Response {
-    let mut res = Response::new(StatusCode::NotFound);
-    res
+async fn not_found() -> http_types::Response {
+    http_types::Response::new(StatusCode::NotFound)
 }
 
 pub(crate) struct RawSegment<'s> {
@@ -240,49 +225,4 @@ impl<'s> PartialEq<DynamicSegment> for RawSegment<'s> {
     fn eq(&self, other: &DynamicSegment) -> bool {
         other == self
     }
-}
-
-#[test]
-fn test() {
-    use crate::macros::route;
-    use serde::{Deserialize, Serialize};
-
-    pub struct Error {
-        code: StatusCode,
-    }
-
-    impl HttpStatusCode for Error {
-        fn code(&self) -> StatusCode {
-            self.code
-        }
-    }
-
-    let mut router = Router::new();
-
-    #[derive(Deserialize, Default)]
-    struct ExampleRequest {
-        image_orientation: String,
-    }
-
-    #[derive(Serialize, Default)]
-    struct ExampleResponse;
-
-    async fn example_route(req: ExampleRequest, params: Params) -> Result<ExampleResponse, Error> {
-        Ok(ExampleResponse)
-    }
-
-    #[derive(Deserialize, Default)]
-    struct ExampleRequest2;
-
-    #[derive(Serialize, Default)]
-    struct ExampleResponse2;
-
-    async fn another_route(req: ExampleRequest2, params: Params) -> Result<ExampleResponse2, Error> {
-        Err(Error {
-            code: StatusCode::Unauthorized,
-        })
-    }
-    
-    router.add(Method::Get, route!(/"images"/image_id), example_route);
-    router.add(Method::Get, route!(/"foo"), another_route);
 }

@@ -1,34 +1,53 @@
 #![feature(proc_macro_hygiene)]
 
-#[macro_use]
-extern crate lazy_static;
+use enzyme::codegen::route;
+use enzyme::router::DynamicSegment;
+use enzyme::req::Req;
+use enzyme::router::Route;
+use enzyme::router::Router;
+use enzyme::router::StaticSegment;
+use enzyme::Error;
+use enzyme::server::Server;
+use http_types::{Method, StatusCode};
+use serde::{Deserialize, Serialize};
 
-mod context;
-mod message;
-mod user;
+#[derive(Deserialize, Default, Debug)]
+struct ExampleRequest {
+    image_orientation: String,
+}
 
-use message::{LogoutRequest, TokenRequest};
-use user::{logout, token};
-
-use enzyme::{
-    macros::route,
-    router::Router,
-    server::{Config, Server},
-};
-use http::method::Method;
+#[derive(Serialize)]
+struct ExampleResponse {
+    foo: String,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let example = |cx: TokenContext, req: LogoutRequest| async { Ok(message::LogoutResponse) };
+    let mut router = Router::new();
 
-    let router = {
-        let mut router = Router::new();
+    router.add(Method::Get, route!(/"images"/image_id), example_route);
+    Server::new().run(std::sync::Arc::new(router));
 
-        router.add(Method::POST, route!(/"token")).mount(token);
-        router.add(Method::POST, route!(/"logout")).mount(logout);
-        router.add(Method::GET, route!(/"example")).mount(example);
-        router
-    };
+    Ok(())
+}
 
-    let config = Config::new("127.0.0.1:4000")?;
-    Ok(Server::new(router).run(config))
+async fn example_route(req: Req<ExampleRequest>) -> Result<ExampleResponse, Error> {
+    use std::str::FromStr;
+    let image_id = u64::from_str(req.params().get("image_id").ok_or_else(|| Error {
+        code: StatusCode::InternalServerError,
+        msg: serde_json::json!("param does not exist"),
+    })?)
+    .map_err(|e| Error {
+        code: StatusCode::BadRequest,
+        msg: serde_json::json!(format!("{}", e)),
+    })?;
+
+    println!("image_id: {}", &image_id);
+
+    let query_params = req.url().query();
+
+    dbg!(&query_params);
+
+    Ok(ExampleResponse {
+        foo: format!("{}", &image_id),
+    })
 }

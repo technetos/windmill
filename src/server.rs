@@ -1,92 +1,55 @@
 use crate::router::Router;
 
 use async_std::io::{self, Read, Write};
-use async_std::net::{self, TcpStream};
+use async_std::net::{TcpListener, TcpStream};
 use async_std::prelude::*;
 use async_std::task::{self, Context, Poll};
 
-use http_types::{Error, Request, Response};
-use std::future::Future;
+use http_types::Error;
 use std::{pin::Pin, sync::Arc};
 
-//pub struct Config {
-//    sock_addr: SocketAddr,
-//}
-
-//impl Config {
-//    pub fn new(addr: &str) -> Result<Self, Error> {
-//        Ok(Self {
-//            sock_addr: addr.parse()?,
-//        })
-//    }
-//
-//    async fn into_socket_addr(self) -> SocketAddr {
-//        self.sock_addr
-//    }
-//}
-
-pub struct Server {
-    router: Arc<Router>,
-}
+pub struct Server;
 
 impl Server {
-    pub fn new(router: Router) -> Self {
-        Self {
-            router: Arc::new(router),
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn run(self) -> Result<(), Error> {
-        task::block_on(async {
-            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
-            let addr = format!("http://{}", listener.local_addr()?);
+    pub fn run(self, router: Arc<Router>) -> Result<(), ()> {
+        let _ = task::block_on(async {
+            use async_std::net::ToSocketAddrs;
+            let listener = TcpListener::bind("127.0.0.1:4000").await.unwrap();
+            let addr = format!("http://{}", listener.local_addr().unwrap());
             println!("listening on {}", addr);
 
             let mut incoming = listener.incoming();
 
-            while let Some(stream) = incoming.next().await {}
-            //            let listener = net::TcpListener::bind("127.0.0.1:4000").await?;
-            //            let addr = format!("http://{}", listener.local_addr()?);
-            //            println!("listening on {}", addr);
-            //            let mut incoming = listener.incoming();
-            //
-            //            while let Some(stream) = incoming.next().await {
-            //                let stream = stream?;
-            //                let addr = addr.clone();
-            //                task::spawn(async {
-            //                    if let Err(err) = accept(addr, stream, self.router.clone()).await {
-            //                        eprintln!("{}", err);
-            //                    }
-            //                });
-            //            }
-            //            Ok(())
-            //        });
-            //        Ok(())
-            //    }
-            Ok(())
-        })
+            while let Some(stream) = incoming.next().await {
+                let router_ptr = router.clone();
+                let stream = stream.unwrap();
+                let addr = addr.clone();
+                task::spawn(async {
+                    if let Err(err) = accept(addr, stream, router_ptr).await {
+                        eprintln!("{}", err);
+                    }
+                });
+            }
+            Ok(()).map_err(|_: ()| ())
+        });
+        Ok(())
     }
 }
 
 async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Error> {
-    // println!("starting new connection from {}", stream.peer_addr()?);
+    println!("starting new connection from {}", stream.peer_addr()?);
 
     // TODO: Delete this line when we implement `Clone` for `TcpStream`.
     let stream = Stream(Arc::new(stream));
 
-    async_h1::server::accept(&addr, stream, |req| {
-        async {
-            let response = router.clone().lookup(req).await;
-            Ok(response)
-            //            let resp = Response::new(StatusCode::Ok)
-            //                .set_header("Content-Type", "text/plain")?
-            //                .set_body_string("Hello".into())?;
-            // To try chunked encoding, replace `set_body_string` with the following method call
-            // .set_body(io::Cursor::new(vec![
-            //     0x48u8, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x21,
-            // ]));
-            //            Ok(resp)
-        }
+    let router = router.clone();
+    async_h1::server::accept(&addr, stream, |req| async {
+        let response = router.clone().lookup(req).await.await;
+        Ok(response)
     })
     .await
 }
