@@ -6,11 +6,13 @@ use enzyme::req::Req;
 use enzyme::router::Route;
 use enzyme::router::Router;
 use enzyme::router::StaticSegment;
+use enzyme::config::Config;
 use enzyme::Error;
 use enzyme::server::Server;
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
+//#[derive(Deserialize, BodyType = Json, Default, Debug)]
 #[derive(Deserialize, Default, Debug)]
 struct ExampleRequest {
     image_orientation: String,
@@ -23,9 +25,13 @@ struct ExampleResponse {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut router = Router::new();
+    let config = Config::new("127.0.0.1:4000");
 
     router.add(Method::Get, route!(/"images"/image_id), example_route);
-    Server::new().run(std::sync::Arc::new(router));
+    router.add(Method::Get, route!(/"images2"/image_id), example_route);
+    router.add(Method::Get, route!(/"images3"/image_id), example_route);
+
+    Server::new(config).run(std::sync::Arc::new(router));
 
     Ok(())
 }

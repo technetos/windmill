@@ -1,6 +1,8 @@
 use crate::params::Params;
 use serde::Deserialize; 
 
+/// Additional features provided through `enzyme` can be accessed through methods and trait
+/// implementations for `Req`.  
 pub struct Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,

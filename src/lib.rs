@@ -1,6 +1,7 @@
 pub mod req;
 pub mod router;
 pub mod server;
+pub mod config;
 
 pub mod codegen {
     pub use enzyme_macro::route;

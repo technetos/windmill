@@ -1,4 +1,4 @@
-use crate::router::Router;
+use crate::{config::Config, router::Router};
 
 use async_std::io::{self, Read, Write};
 use async_std::net::{TcpListener, TcpStream};
@@ -8,28 +8,32 @@ use async_std::task::{self, Context, Poll};
 use http_types::Error;
 use std::{pin::Pin, sync::Arc};
 
-pub struct Server;
+pub struct Server {
+    config: Config,
+}
 
 impl Server {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+        }
     }
 
     pub fn run(self, router: Arc<Router>) -> Result<(), ()> {
         let _ = task::block_on(async {
             use async_std::net::ToSocketAddrs;
-            let listener = TcpListener::bind("127.0.0.1:4000").await.unwrap();
+            let listener = TcpListener::bind(self.config.addr()).await.unwrap();
             let addr = format!("http://{}", listener.local_addr().unwrap());
             println!("listening on {}", addr);
 
             let mut incoming = listener.incoming();
 
             while let Some(stream) = incoming.next().await {
-                let router_ptr = router.clone();
+                let router = router.clone();
                 let stream = stream.unwrap();
                 let addr = addr.clone();
                 task::spawn(async {
-                    if let Err(err) = accept(addr, stream, router_ptr).await {
+                    if let Err(err) = accept(addr, stream, router).await {
                         eprintln!("{}", err);
                     }
                 });
