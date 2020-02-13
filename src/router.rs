@@ -28,6 +28,57 @@ pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
 
+async fn json_endpoint<Error, Body, Res>(
+    mut req: http_types::Request,
+    params: Params,
+    endpoint: impl Endpoint<Error, Body, Res> + Send + Sync,
+) -> http_types::Response
+where
+    Error: HttpError + 'static + Send + Sync,
+    Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
+    Res: Serialize + 'static + Send + Sync,
+{
+    use async_std::prelude::*;
+
+    let has_body = req
+        .header(&headers::CONTENT_LENGTH)
+        .map(|header_values| header_values.first().map(|value| value.as_str() != "0"))
+        .flatten()
+        .unwrap_or_else(|| false);
+
+    let mut body = vec![];
+    if has_body {
+        let _ = req.read_to_end(&mut body).await;
+    }
+
+    let req_body: Option<Body> = serde_json::from_slice(&body).unwrap_or_else(|_| None);
+
+    let res_body: Res = match endpoint.call(Req::new(req, req_body, params)).await {
+        Ok(res_body) => res_body,
+        Err(e) => {
+            let mut res = http_types::Response::new(e.code());
+            let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+            res.set_body(serde_json::to_vec(e.msg()).unwrap());
+            return res;
+        }
+    };
+
+    let res_body_bytes = match serde_json::to_vec(&res_body) {
+        Ok(res_body_bytes) => res_body_bytes,
+        Err(e) => {
+            let mut res = http_types::Response::new(StatusCode::InternalServerError);
+            let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+            res.set_body(serde_json::to_vec(&format!("{}", e)).unwrap());
+            return res;
+        }
+    };
+
+    let mut res = http_types::Response::new(StatusCode::Ok);
+    res.set_body(res_body_bytes);
+    let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+    res
+}
+
 impl Router {
     pub fn new() -> Self {
         Router {
@@ -42,7 +93,7 @@ impl Router {
         endpoint: impl Endpoint<Error, Body, Res> + Send + Sync,
     ) where
         Error: HttpError + 'static + Send + Sync,
-        Body: for<'de> Deserialize<'de> + Default + 'static + Send + Sync,
+        Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
         Res: Serialize + 'static + Send + Sync,
     {
         let entry = self
@@ -51,60 +102,7 @@ impl Router {
             .or_insert_with(|| Vec::<Route>::new());
 
         let handler = move |mut req: http_types::Request, params: Params| -> ResponseFuture {
-            use async_std::prelude::*;
-
-            let fut = async move {
-                let has_body = req
-                    .header(&headers::CONTENT_LENGTH)
-                    .map(|values| values.first().map(|value| value.as_str() == "0"))
-                    .flatten()
-                    .unwrap_or_else(|| false);
-
-                let req_body: Body = if has_body {
-                    let mut body = vec![];
-                    if let Err(_) = req.read_to_end(&mut body).await {
-                        return http_types::Response::new(StatusCode::BadRequest);
-                    }
-
-                    match serde_json::from_slice(&body) {
-                        Ok(res_body) => res_body,
-                        Err(_) => return http_types::Response::new(StatusCode::BadRequest),
-                    }
-                } else {
-                    Body::default()
-                };
-
-                let res_body: Res = match endpoint.call(Req::new(req, req_body, params)).await {
-                    Ok(res_body) => res_body,
-                    Err(e) => {
-                        let mut res = http_types::Response::new(e.code());
-                        res.set_body(serde_json::to_vec(e.msg()).unwrap());
-                        let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
-                        return res;
-                    }
-                };
-
-                let res_body_bytes = match serde_json::to_vec(&res_body) {
-                    Ok(res_body_bytes) => res_body_bytes,
-                    Err(e) => {
-                        let mut res = http_types::Response::new(StatusCode::InternalServerError);
-                        let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
-                        res.set_body(
-                            serde_json::to_vec(&serde_json::json!({
-                                "error": format!("{}", e),
-                            }))
-                            .unwrap(),
-                        );
-                        return res;
-                    }
-                };
-
-                let mut res = http_types::Response::new(StatusCode::Ok);
-                res.set_body(res_body_bytes);
-                let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
-                res
-            };
-            Box::pin(fut)
+            Box::pin(json_endpoint(req, params, endpoint))
         };
 
         route.handler = Some(Box::new(handler));

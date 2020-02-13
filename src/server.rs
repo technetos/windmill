@@ -14,38 +14,38 @@ pub struct Server {
 
 impl Server {
     pub fn new(config: Config) -> Self {
-        Self {
-            config,
-        }
+        Self { config }
     }
 
-    pub fn run(self, router: Arc<Router>) -> Result<(), ()> {
-        let _ = task::block_on(async {
-            use async_std::net::ToSocketAddrs;
-            let listener = TcpListener::bind(self.config.addr()).await.unwrap();
-            let addr = format!("http://{}", listener.local_addr().unwrap());
+    pub fn run(self, router: Arc<Router>) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(task::block_on(async {
+            let listener = TcpListener::bind(self.config.addr())
+                .await
+                .map_err(|e| format!("Unable to bind to tcp socket: {}", e))?;
+
+            let addr = format!("http://{}", listener.local_addr()?);
             println!("listening on {}", addr);
 
             let mut incoming = listener.incoming();
 
             while let Some(stream) = incoming.next().await {
                 let router = router.clone();
-                let stream = stream.unwrap();
                 let addr = addr.clone();
+                let stream = stream?;
                 task::spawn(async {
                     if let Err(err) = accept(addr, stream, router).await {
                         eprintln!("{}", err);
                     }
                 });
             }
-            Ok(()).map_err(|_: ()| ())
-        });
-        Ok(())
+            Ok(())
+        })
+        .map_err(|e: Box<dyn std::error::Error>| format!("Unable to spawn blocking task: {}", e))?)
     }
 }
 
 async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Error> {
-    println!("starting new connection from {}", stream.peer_addr()?);
+    //println!("starting new connection from {}", stream.peer_addr()?);
 
     // TODO: Delete this line when we implement `Clone` for `TcpStream`.
     let stream = Stream(Arc::new(stream));
