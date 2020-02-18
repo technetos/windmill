@@ -1,14 +1,13 @@
 #![feature(proc_macro_hygiene)]
 
-use enzyme::codegen::route;
-use enzyme::config::Config;
-use enzyme::req::Req;
-use enzyme::router::DynamicSegment;
-use enzyme::router::Route;
-use enzyme::router::Router;
-use enzyme::router::StaticSegment;
-use enzyme::server::Server;
-use enzyme::Error;
+use enzyme::{
+    codegen::route,
+    config::Config,
+    req::Req,
+    router::{DynamicSegment, Route, Router, StaticSegment},
+    server::Server,
+    Error,
+};
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +25,9 @@ fn main() {
     let mut router = Router::new();
     let config = Config::new("127.0.0.1:4000");
 
-    router.add(Method::Post, route!(/"images"/image_id), example_route);
+    router.add(Method::Get, route!(/"images"/image_id), example_route);
 
-    if let Err(e) = Server::new(config).run(std::sync::Arc::new(router)) {
+    if let Err(e) = Server::new(config).run(router) {
         println!("{}", e);
     }
 }
@@ -49,10 +48,7 @@ async fn example_route(req: Req<ExampleRequest>) -> Result<ExampleResponse, Erro
         msg: serde_json::json!("body required"),
     })?;
 
-
     dbg!(body);
 
-    Ok(ExampleResponse {
-        foo: String::new(),
-    })
+    Ok(ExampleResponse { foo: String::new() })
 }

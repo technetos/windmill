@@ -93,9 +93,8 @@ impl Parse for DynamicSegment {
 }
 
 impl Route {
-    fn push_statements(&self) -> proc_macro2::TokenStream {
+    fn static_segments(&self) -> proc_macro2::TokenStream {
         let mut static_segments = vec![];
-        let mut dynamic_segment_names = vec![];
 
         self.segments.iter().for_each(|segment| {
             match segment {
@@ -103,15 +102,11 @@ impl Route {
                     let content = &static_segment.content;
                     static_segments.push(quote!(#content));
                 }
-                Segment::Dynamic(dynamic_segment) => {
-                    let name = &dynamic_segment.field_name.to_string();
-                    dynamic_segment_names.push(quote!(#name));
-                }
+                _ => {}
             }
         });
 
         let static_positions = &self.static_segment_positions;
-        let dynamic_positions = &self.dynamic_segment_positions;
 
         let static_segment_inserts = quote! {
             #(
@@ -121,6 +116,30 @@ impl Route {
                 });
             )*
         };
+
+        quote! {
+            {
+                let mut static_segments = vec![];
+                #static_segment_inserts
+                static_segments
+            }
+        }
+    }
+
+    fn dynamic_segments(&self) -> proc_macro2::TokenStream {
+        let mut dynamic_segment_names = vec![];
+
+        self.segments.iter().for_each(|segment| {
+            match segment {
+                Segment::Dynamic(dynamic_segment) => {
+                    let name = &dynamic_segment.field_name.to_string();
+                    dynamic_segment_names.push(quote!(#name));
+                }
+                _ => {}
+            }
+        });
+
+        let dynamic_positions = &self.dynamic_segment_positions;
 
         let dynamic_segment_inserts = quote! {
             #(
@@ -132,8 +151,11 @@ impl Route {
         };
 
         quote! {
-            #static_segment_inserts
-            #dynamic_segment_inserts
+            {
+                let mut dynamic_segments = vec![];
+                #dynamic_segment_inserts
+                dynamic_segments
+            }
         }
     }
 }
@@ -142,21 +164,15 @@ impl Route {
 pub fn route(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Route);
 
-    let push_statements = input.push_statements();
+    let dynamic_segments = input.dynamic_segments();
+    let static_segments = input.static_segments();
 
     let output = quote! {
-        || -> Route {
-            let mut static_segments = vec![];
-            let mut dynamic_segments = vec![];
-
-            #push_statements
-
-            Route {
-                static_segments,
-                dynamic_segments,
-                handler: None,
-            }
-        }()
+        Route {
+            static_segments: #static_segments,
+            dynamic_segments: #dynamic_segments,
+            handler: None,
+        }
     };
 
     output.into()

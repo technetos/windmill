@@ -1,12 +1,11 @@
 use crate::{config::Config, router::Router};
 
-use async_std::io::{self, Read, Write};
 use async_std::net::{TcpListener, TcpStream};
 use async_std::prelude::*;
-use async_std::task::{self, Context, Poll};
+use async_std::task;
 
 use http_types::Error;
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 pub struct Server {
     config: Config,
@@ -17,7 +16,8 @@ impl Server {
         Self { config }
     }
 
-    pub fn run(self, router: Arc<Router>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(self, router: Router) -> Result<(), Box<dyn std::error::Error>> {
+        let router = Arc::new(router);
         Ok(task::block_on(async {
             let listener = TcpListener::bind(self.config.addr())
                 .await
@@ -45,42 +45,10 @@ impl Server {
 }
 
 async fn accept(addr: String, stream: TcpStream, router: Arc<Router>) -> Result<(), Error> {
-    //println!("starting new connection from {}", stream.peer_addr()?);
-
-    // TODO: Delete this line when we implement `Clone` for `TcpStream`.
-    let stream = Stream(Arc::new(stream));
-
     let router = router.clone();
-    async_h1::server::accept(&addr, stream, |req| async {
+    async_h1::accept(&addr, stream.clone(), |req| async {
         let response = router.clone().lookup(req).await.await;
         Ok(response)
     })
     .await
-}
-
-#[derive(Clone)]
-struct Stream(Arc<TcpStream>);
-
-impl Read for Stream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut &*self.0).poll_read(cx, buf)
-    }
-}
-
-impl Write for Stream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context, buf: &[u8]) -> Poll<io::Result<usize>> {
-        Pin::new(&mut &*self.0).poll_write(cx, buf)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut &*self.0).poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut &*self.0).poll_close(cx)
-    }
 }
