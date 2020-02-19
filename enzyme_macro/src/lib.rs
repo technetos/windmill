@@ -49,7 +49,7 @@ impl Parse for Route {
 
         let segments = {
             let mut segments = vec![];
-            while !input.is_empty() && !input.peek(Token![=]) && !input.peek2(Token![>]) {
+            while !input.is_empty() {
                 let lookahead = input.lookahead1();
                 if lookahead.peek(LitStr) {
                     segments.push(input.parse().map(Segment::Static)?);
