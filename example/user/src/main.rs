@@ -1,13 +1,6 @@
 #![feature(proc_macro_hygiene)]
 
-use enzyme::{
-    codegen::route,
-    config::Config,
-    req::Req,
-    router::{DynamicSegment, Route, Router, StaticSegment},
-    server::Server,
-    Error,
-};
+use enzyme::{route, Config, DynamicSegment, Error, Req, Route, Router, Server, StaticSegment};
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 

@@ -1,4 +1,8 @@
-use crate::{params::Params, endpoint::{Endpoint, json_endpoint}, HttpError};
+use crate::{
+    endpoint::{json_endpoint, Endpoint},
+    params::Params,
+    error::Error,
+};
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
@@ -15,12 +19,14 @@ pub struct DynamicSegment {
     pub position: usize,
 }
 
+/// A route constructed using the `route!` macro.  
 pub struct Route {
     pub static_segments: Vec<StaticSegment>,
     pub dynamic_segments: Vec<DynamicSegment>,
     pub handler: Option<Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>>,
 }
 
+/// The router for routing to endpoints.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
@@ -32,13 +38,12 @@ impl Router {
         }
     }
 
-    pub fn add<Error, Body, Res>(
+    pub fn add<Body, Res>(
         &mut self,
         method: Method,
         mut route: Route,
-        endpoint: impl Endpoint<Error, Body, Res> + Send + Sync,
+        endpoint: impl Endpoint<Body, Res> + Send + Sync,
     ) where
-        Error: HttpError + 'static + Send + Sync,
         Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
         Res: Serialize + 'static + Send + Sync,
     {

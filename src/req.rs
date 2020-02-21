@@ -1,8 +1,8 @@
+
 use crate::params::Params;
 use serde::Deserialize;
 
-/// Additional features provided through `enzyme` can be accessed through methods and trait
-/// implementations on `Req`.  
+/// A request type encapsulating `http-types::Request`.  
 pub struct Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,
@@ -36,14 +36,17 @@ impl<Body> Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,
 {
+    /// Create a new instance of `Req`.  
     pub fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
         Self { req, body, params }
     }
 
+    /// Access the body of the request.  
     pub fn body(&self) -> Option<&Body> {
         self.body.as_ref()
     }
 
+    /// Access the parameters of the path.  
     pub fn params(&self) -> &Params {
         &self.params
     }

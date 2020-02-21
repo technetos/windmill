@@ -1,10 +1,10 @@
-use crate::{params::Params, req::Req, HttpError};
+use crate::{params::Params, req::Req, error::Error};
 use serde::{Deserialize, Serialize};
-use std::{pin::Pin, future::Future};
+use std::{future::Future, pin::Pin};
 
-pub trait Endpoint<Error, Body, Res>: 'static + Copy
+/// A trait that represents the functions used as routes.  
+pub trait Endpoint<Body, Res>: 'static + Copy
 where
-    Error: HttpError + 'static,
     Body: for<'de> Deserialize<'de> + 'static + Send,
     Res: Serialize + 'static,
 {
@@ -12,28 +12,28 @@ where
     fn call(&self, req: Req<Body>) -> Self::Fut;
 }
 
-impl<Error, Body, Res, F, G> Endpoint<Error, Body, Res> for F
+/// A blanket impl over async functions.  
+impl<Body, Res, F, G> Endpoint<Body, Res> for F
 where
-    Error: HttpError + 'static,
     Body: for<'de> Deserialize<'de> + 'static + Send,
     Res: Serialize + 'static + Send,
     G: Future<Output = Result<Res, Error>> + 'static + Send + Sync,
     F: Fn(Req<Body>) -> G + 'static + Copy,
 {
     type Fut = Pin<Box<dyn Future<Output = Result<Res, Error>> + Send + Sync>>;
+    /// Invoke the endpoint passing in the request.  
     fn call(&self, req: Req<Body>) -> Self::Fut {
         let fut = (self)(req);
         Box::pin(async move { fut.await })
     }
 }
 
-pub(crate) async fn json_endpoint<Error, Body, Res>(
+pub(crate) async fn json_endpoint<Body, Res>(
     mut req: http_types::Request,
     params: Params,
-    endpoint: impl Endpoint<Error, Body, Res> + Send + Sync,
+    endpoint: impl Endpoint<Body, Res> + Send + Sync,
 ) -> http_types::Response
 where
-    Error: HttpError + 'static + Send + Sync,
     Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
     Res: Serialize + 'static + Send + Sync,
 {
