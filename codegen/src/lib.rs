@@ -160,6 +160,14 @@ impl Route {
     }
 }
 
+/// The `route!` macro is used to generate a [`Route`](struct.Route.html) from a path.  
+/// ```
+/// route!(/"path"/param/"path"/"path")
+/// ```
+/// Where `"path"` is a static segment that must be matched verbatim and `param` is a parameter
+/// that is captured and made available through the [`.params()`](struct.Req.html#method.params)
+/// method on [`Req`](struct.Req.html).  
+
 #[proc_macro]
 pub fn route(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Route);

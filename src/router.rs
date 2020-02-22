@@ -20,7 +20,7 @@ pub struct DynamicSegment {
     pub position: usize,
 }
 
-/// A route constructed using the `route!` macro.  
+/// A route constructed using the [`route!`](macro.route.html) macro.  
 pub struct Route {
     pub static_segments: Vec<StaticSegment>,
     pub dynamic_segments: Vec<DynamicSegment>,
@@ -34,7 +34,6 @@ pub struct Router {
 impl Router {
     /// Create a new Router.  See the [`add`](struct.Router.html#method.add) method for a more
     /// useful example.  
-    ///
     /// ```
     /// let mut router = Router::new();
     /// ```
@@ -44,15 +43,17 @@ impl Router {
         }
     }
 
+    /// Add routes to the router using the `add` method.  A route in the router is composed of a
+    /// `http-types::Method`, a [`Route`](struct.Route.html) and a function pointer.  
     /// ```
-    /// async fn example(Req<String>) -> Result<String, Error> {
+    /// async fn example(req: Req<String>) -> Result<String, Error> {
     ///   Ok(String::from("greetings"))
     /// }
     ///
     /// let mut router = Router::new();
     ///
     /// router.add(Method::Get, route!(/"example"), example);
-    ///
+    /// ```
     pub fn add<Body, Res>(
         &mut self,
         method: Method,

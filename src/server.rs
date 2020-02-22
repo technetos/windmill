@@ -7,15 +7,28 @@ use async_std::task;
 use http_types::Error;
 use std::sync::Arc;
 
+/// The server that listens for requests.  
 pub struct Server {
     config: Config,
 }
 
 impl Server {
+    /// ```
+    /// let config = Config::new("127.0.0.1:4000");
+    /// let server = Server::new(config);
+    /// ```
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 
+    /// ```
+    /// let mut router = Router::new();
+    /// let config = Config::new("127.0.0.1:4000");
+    ///
+    /// if let Err(e) = Server::new(config).run(router) {
+    ///     println!("{}", e);
+    /// }
+    /// ```
     pub fn run(self, router: Router) -> Result<(), Box<dyn std::error::Error>> {
         let router = Arc::new(router);
         Ok(task::block_on(async {

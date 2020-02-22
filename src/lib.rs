@@ -2,8 +2,9 @@
 //!
 //! A simple to use async web server framework.  
 //!
-//! Currently all requests and response bodies are JSON only.  Making this pluggable is a future
-//! goal.  
+//! A core concept in enzyme is automatic deserialization and serialization of user defined
+//! request and response types.  Currently all requests and response bodies are JSON only.  Making
+//! this pluggable is a future goal.  
 //!
 //! # Basic Usage
 //!
