@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
 type ResponseFuture = Pin<Box<dyn Future<Output = http_types::Response> + Send + Sync>>;
+type RouteFn = Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>;
 
 pub struct StaticSegment {
     pub value: &'static str,
@@ -23,21 +24,35 @@ pub struct DynamicSegment {
 pub struct Route {
     pub static_segments: Vec<StaticSegment>,
     pub dynamic_segments: Vec<DynamicSegment>,
-    pub handler: Option<Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>>,
+    pub handler: Option<RouteFn>,
 }
-
-/// The router for routing to endpoints.  
+/// A router for routing requests to endpoints.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
 
 impl Router {
+    /// Create a new Router.  See the [`add`](struct.Router.html#method.add) method for a more
+    /// useful example.  
+    ///
+    /// ```
+    /// let mut router = Router::new();
+    /// ```
     pub fn new() -> Self {
         Router {
             table: HashMap::new(),
         }
     }
 
+    /// ```
+    /// async fn example(Req<String>) -> Result<String, Error> {
+    ///   Ok(String::from("greetings"))
+    /// }
+    ///
+    /// let mut router = Router::new();
+    ///
+    /// router.add(Method::Get, route!(/"example"), example);
+    ///
     pub fn add<Body, Res>(
         &mut self,
         method: Method,

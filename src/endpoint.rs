@@ -2,7 +2,7 @@ use crate::{params::Params, req::Req, error::Error};
 use serde::{Deserialize, Serialize};
 use std::{future::Future, pin::Pin};
 
-/// A trait that represents the functions used as routes.  
+/// A trait implemented by functions that can be used as routes.  
 pub trait Endpoint<Body, Res>: 'static + Copy
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,

@@ -2,7 +2,7 @@
 use crate::params::Params;
 use serde::Deserialize;
 
-/// A request type encapsulating `http-types::Request`.  
+/// A request type encapsulating `http-types::Request`, url parameters and the deserialized body.   
 pub struct Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,

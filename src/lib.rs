@@ -5,7 +5,7 @@
 //! Currently all requests and response bodies are JSON only.  Making this pluggable is a future
 //! goal.  
 //!
-//! __Basic Usage__
+//! # Basic Usage
 //!
 //! ```no_run
 //! fn main() {
