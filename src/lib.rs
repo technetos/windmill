@@ -1,4 +1,4 @@
-//! # Enzyme
+//! # Enzyme 🧪
 //!
 //! A simple to use async web server framework.  
 //!
@@ -6,9 +6,23 @@
 //! request and response types.  Currently all requests and response bodies are JSON only.  Making
 //! this pluggable is a future goal.  
 //!
+//! The `Content-Length` header is required in any requests containing a body that
+//! you wish to be automatically deserialized.  A `Content-Length` of 0 will prevent
+//! deserialization of the body entirely.   
+//!
 //! # Basic Usage
 //!
-//! ```no_run
+//! ```
+//! #[derive(Deserialize)]
+//! struct ExampleBody<'s> {
+//!     name: &'s str,
+//! }
+//!
+//! #[derive(Serialize)]
+//! struct ExampleResponse {
+//!     greeting: String,
+//! }
+//!
 //! fn main() {
 //!     let mut router = Router::new();
 //!     let config = Config::new("127.0.0.1:4000");
@@ -20,8 +34,15 @@
 //!     }
 //! }
 //!
-//! async fn example(req: Req<String>) -> Result<String, Error> {
-//!     Ok(String::from("foo"))
+//! async fn example(req: Req<ExampleBody>) -> Result<ExampleResponse, Error> {
+//!     let body = req.body().ok_or_else(|| Error {
+//!         code: StatusCode::BadRequest,
+//!         msg: json!("body required"),
+//!     })?;
+//!
+//!     Ok(ExampleResponse {
+//!         greeting: format!("Greetings {}!", body.name),
+//!     })
 //! }
 //! ```
 

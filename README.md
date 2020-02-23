@@ -5,8 +5,8 @@ A bare bones http web framework that stays out of your way.
 ## Server
 
 The `Server` type is used to tie everything together.  A `Server` instance is
-constructed with `Server::new` and takes a `Router` as an argument.  Finally the
-`.run` method takes in a `Config` as an argument and starts the webserver.  
+constructed with `Server::new` and takes a `Config` as an argument.  Finally the
+`.run` method takes in a `Router` as an argument and starts the webserver.  
 
 ## Routing
 

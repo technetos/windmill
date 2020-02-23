@@ -36,17 +36,28 @@ impl<Body> Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,
 {
-    /// Create a new instance of `Req`.  
-    pub fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
+    pub(crate) fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
         Self { req, body, params }
     }
 
     /// Access the body of the request.  
+    /// ```
+    /// let body = req.body().ok_or_else(|| Error {
+    ///     code: StatusCode::BadRequest,
+    ///     msg: json!("body required"),
+    /// })?;
+    /// ```
     pub fn body(&self) -> Option<&Body> {
         self.body.as_ref()
     }
 
     /// Access the parameters of the path.  
+    /// ```
+    /// let param = req.params().get("foo").ok_or_else(|| Error {
+    ///   code: StatusCode::InternalServerError,
+    ///   msg: json!("param foo does not exist"),
+    /// })?;
+    /// ```
     pub fn params(&self) -> &Params {
         &self.params
     }
