@@ -1,6 +1,8 @@
 #![feature(proc_macro_hygiene)]
 
-use enzyme::{route, Config, DynamicSegment, Error, Req, Route, Router, Server, StaticSegment};
+use enzyme::prelude::*;
+use enzyme::{Config, Router, Server};
+
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +27,7 @@ fn main() {
     }
 }
 
-async fn example_route(req: Req<ExampleRequest>) -> Result<ExampleResponse, Error> {
+async fn example_route(req: Req<ExampleRequest>) -> Result<(String, String), Error> {
     use std::str::FromStr;
     let image_id = u64::from_str(req.params().get("image_id").ok_or_else(|| Error {
         code: StatusCode::InternalServerError,
@@ -43,5 +45,5 @@ async fn example_route(req: Req<ExampleRequest>) -> Result<ExampleResponse, Erro
 
     dbg!(body);
 
-    Ok(ExampleResponse { foo: String::new() })
+    Ok((req.params().get("image_id").unwrap().into(), String::new()))
 }

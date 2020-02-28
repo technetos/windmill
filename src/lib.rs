@@ -52,6 +52,7 @@ mod req;
 mod router;
 mod server;
 mod error;
+mod route;
 
 mod codegen {
     pub use codegen::route;
@@ -65,7 +66,8 @@ pub use crate::{
     config::Config,
     endpoint::Endpoint,
     req::Req,
-    router::{DynamicSegment, Route, Router, StaticSegment},
+    router::Router,
+    route::{DynamicSegment, StaticSegment, Route},
     server::Server,
     error::Error,
     codegen::route,

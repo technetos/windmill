@@ -167,7 +167,10 @@ impl Route {
 /// Where `"path"` is a static segment that must be matched verbatim and `param` is a parameter
 /// that is captured and made available through the [`.params()`](struct.Req.html#method.params)
 /// method on [`Req`](struct.Req.html).  
-
+///
+/// ## Paths
+///
+/// The `route!` macro takes a list of string literals and idents beginning with and separated by `/`.  
 #[proc_macro]
 pub fn route(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Route);

@@ -2,30 +2,12 @@ use crate::{
     endpoint::{json_endpoint, Endpoint},
     params::Params,
     error::Error,
+    route::{Route, RawRoute, ResponseFuture, DynamicSegment, StaticSegment},
 };
 use http_types::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
-type ResponseFuture = Pin<Box<dyn Future<Output = http_types::Response> + Send + Sync>>;
-type RouteFn = Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>;
-
-pub struct StaticSegment {
-    pub value: &'static str,
-    pub position: usize,
-}
-
-pub struct DynamicSegment {
-    pub name: &'static str,
-    pub position: usize,
-}
-
-/// A route constructed using the [`route!`](macro.route.html) macro.  
-pub struct Route {
-    pub static_segments: Vec<StaticSegment>,
-    pub dynamic_segments: Vec<DynamicSegment>,
-    pub handler: Option<RouteFn>,
-}
 /// A router for routing requests to endpoints.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
@@ -44,7 +26,7 @@ impl Router {
     }
 
     /// Add routes to the router using the `add` method.  A route in the router is composed of a
-    /// `http-types::Method`, a [`Route`](struct.Route.html) and a function pointer.  
+    /// `http-types::Method`, a [`Route`](struct.Route.html) and a function.  
     /// ```
     /// async fn example(req: Req<String>) -> Result<String, Error> {
     ///   Ok(String::from("greetings"))
@@ -138,53 +120,4 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 
 async fn not_found() -> http_types::Response {
     http_types::Response::new(StatusCode::NotFound)
-}
-
-pub(crate) struct RawSegment<'s> {
-    value: &'s str,
-    position: usize,
-}
-
-pub(crate) struct RawRoute<'s> {
-    pub raw_segments: Vec<RawSegment<'s>>,
-}
-
-impl<'s> RawRoute<'s> {
-    pub(crate) fn from_path(path: &'s str) -> Self {
-        Self {
-            raw_segments: path
-                .split("/")
-                .skip(1)
-                .enumerate()
-                .map(|(i, segment)| RawSegment {
-                    value: segment,
-                    position: i,
-                })
-                .collect(),
-        }
-    }
-}
-
-impl<'s> PartialEq<RawSegment<'s>> for StaticSegment {
-    fn eq(&self, other: &RawSegment) -> bool {
-        self.position == other.position && self.value == other.value
-    }
-}
-
-impl<'s> PartialEq<RawSegment<'s>> for DynamicSegment {
-    fn eq(&self, other: &RawSegment) -> bool {
-        self.position == other.position
-    }
-}
-
-impl<'s> PartialEq<StaticSegment> for RawSegment<'s> {
-    fn eq(&self, other: &StaticSegment) -> bool {
-        other == self
-    }
-}
-
-impl<'s> PartialEq<DynamicSegment> for RawSegment<'s> {
-    fn eq(&self, other: &DynamicSegment) -> bool {
-        other == self
-    }
 }
