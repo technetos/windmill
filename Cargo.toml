@@ -8,9 +8,8 @@ edition = "2018"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.40"
-async-trait = "0.1.16"
-async-h1 = { path = "../async-h1" }
-http-types = { path = "../http-types" }
-async-std = "1.2.0"
+serde_json = "1.0"
+async-h1 = "1.0"
+http-types = "1.0"
+async-std = "1.5.0"
 codegen = { path = "codegen" }
