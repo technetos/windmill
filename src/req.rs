@@ -35,7 +35,7 @@ impl<Body> Req<Body>
 where
     Body: for<'de> Deserialize<'de> + 'static + Send,
 {
-    pub(crate) fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
+    pub fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
         Self { req, body, params }
     }
 

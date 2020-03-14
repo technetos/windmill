@@ -1,8 +1,8 @@
 use crate::params::Params;
-use std::{pin::Pin, future::Future};
+use std::{future::Future, pin::Pin};
 
 pub(crate) type ResponseFuture = Pin<Box<dyn Future<Output = http_types::Response> + Send + Sync>>;
-type RouteFn = Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>;
+pub(crate) type RouteFn = Box<dyn Fn(http_types::Request, Params) -> ResponseFuture + Send + Sync>;
 
 /// A route constructed using the [`route!`](macro.route.html) macro.  
 pub struct Route {
