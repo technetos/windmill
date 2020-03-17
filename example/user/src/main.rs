@@ -5,13 +5,8 @@ use enzyme::*;
 use http_types::{headers, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct ExampleRequest {
-    image_orientation: String,
-}
-
-#[derive(Serialize)]
-struct ExampleResponse {
     foo: String,
 }
 
@@ -19,16 +14,19 @@ fn main() {
     let mut router = Router::new();
     let config = Config::new("127.0.0.1:4000");
 
-    router.add(Method::Get, route!(/"images"/image_id), example_route, service);
+    #[rustfmt::skip]
+    router.add(Method::Get, route!(/"example"/id), example_route, service);
+    router.add(Method::Get, route!(/"a"/b/c), example_route2, service);
+    router.add(Method::Get, route!(/a/b/c), example_route3, service);
 
     if let Err(e) = Server::new(config).run(router) {
         println!("{}", e);
     }
 }
 
-async fn example_route(req: Req<ExampleRequest>) -> Result<(String, String), Error> {
+async fn example_route(req: Req<ExampleRequest>) -> Result<(u64, String), Error> {
     use std::str::FromStr;
-    let image_id = u64::from_str(req.params().get("image_id").ok_or_else(|| Error {
+    let id = u64::from_str(req.params().get("id").ok_or_else(|| Error {
         code: StatusCode::InternalServerError,
         msg: serde_json::json!("param does not exist"),
     })?)
@@ -44,30 +42,29 @@ async fn example_route(req: Req<ExampleRequest>) -> Result<(String, String), Err
 
     dbg!(body);
 
-    Ok((req.params().get("image_id").unwrap().into(), String::new()))
+    Ok((id, String::new()))
+}
+
+async fn example_route2(req: Req<ExampleRequest>) -> Result<(String, String), Error> {
+    dbg!(2);
+    Ok(("".into(), "".into()))
+}
+
+async fn example_route3(req: Req<ExampleRequest>) -> Result<(String, String), Error> {
+    dbg!(3);
+    Ok(("".into(), "".into()))
 }
 
 pub async fn service<Body, Res>(
     mut req: http_types::Request,
     params: Params,
-    endpoint: impl Endpoint<Body, Res> + Send + Sync,
+    endpoint: impl Endpoint<Body, Res>,
 ) -> http_types::Response
 where
-    Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
-    Res: Serialize + 'static + Send + Sync,
+    Body: for<'de> Deserialize<'de>,
+    Res: Serialize,
 {
-    use async_std::prelude::*;
-
-    let has_body = req
-        .header(&headers::CONTENT_LENGTH)
-        .map(|header_values| header_values.first().map(|value| value.as_str() != "0"))
-        .flatten()
-        .unwrap_or_else(|| false);
-
-    let mut body = vec![];
-    if has_body {
-        let _ = req.read_to_end(&mut body).await;
-    }
+    let body = read_body(&mut req).await;
 
     let req_body: Option<Body> = serde_json::from_slice(&body).unwrap_or_else(|_| None);
 

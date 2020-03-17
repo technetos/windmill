@@ -1,20 +1,13 @@
 use crate::params::Params;
-use serde::Deserialize;
 
-/// A request type encapsulating `http-types::Request`, url parameters and the deserialized body.   
-pub struct Req<Body>
-where
-    Body: for<'de> Deserialize<'de> + 'static + Send,
-{
+/// A request type encapsulating `http-types::Request`, url parameters and the body if any.    
+pub struct Req<Body> {
     req: http_types::Request,
     body: Option<Body>,
     params: Params,
 }
 
-impl<Body> std::ops::Deref for Req<Body>
-where
-    Body: for<'de> Deserialize<'de> + 'static + Send,
-{
+impl<Body> std::ops::Deref for Req<Body> {
     type Target = http_types::Request;
 
     fn deref(&self) -> &Self::Target {
@@ -22,19 +15,13 @@ where
     }
 }
 
-impl<Body> std::ops::DerefMut for Req<Body>
-where
-    Body: for<'de> Deserialize<'de> + 'static + Send,
-{
+impl<Body> std::ops::DerefMut for Req<Body> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.req
     }
 }
 
-impl<Body> Req<Body>
-where
-    Body: for<'de> Deserialize<'de> + 'static + Send,
-{
+impl<Body> Req<Body> {
     pub fn new(req: http_types::Request, body: Option<Body>, params: Params) -> Self {
         Self { req, body, params }
     }

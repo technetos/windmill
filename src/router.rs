@@ -1,21 +1,21 @@
 use crate::{
-    endpoint::{Endpoint, Service},
-    error::Error,
+    endpoint::Endpoint,
     params::Params,
-    route::{DynamicSegment, RawRoute, ResponseFuture, Route, StaticSegment},
+    route::{RawRoute, ResponseFuture, Route},
+    service::Service,
 };
 use http_types::{Method, StatusCode};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
+use std::{collections::HashMap, future::Future, sync::Arc};
 
-/// A router for routing requests to endpoints.  
+/// A router for dispatching requests to endpoints.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
 
 impl Router {
-    /// Create a new Router.  See the [`add`](struct.Router.html#method.add) method for a more
-    /// useful example.  
+    /// Create a new Router.  
+    ///
+    /// ## Examples
     /// ```
     /// let mut router = Router::new();
     /// ```
@@ -25,32 +25,11 @@ impl Router {
         }
     }
 
-    /// Add routes to the router using the `add` method.  A route in the router is composed of a
-    /// `http-types::Method`, a [`Route`](struct.Route.html) and an endpoint and a service.  
-    /// ```
-    /// pub async fn service<Body, Res>(
-    ///     mut req: http_types::Request,
-    ///     params: Params,
-    ///     endpoint: impl Endpoint<Body, Res> + Send + Sync,
-    /// ) -> http_types::Response
-    /// where
-    ///     Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
-    ///     Res: Serialize + 'static + Send + Sync,
-    /// 
-    ///     let mut body = vec![];
-    ///     if has_body {
-    ///         let _ = req.read_to_end(&mut body).await;
-    ///     }
-    ///     let body: Body = serde_json::from_slice(&body).unwrap();
-    ///     let res_body: Res = endpoint.call(Req::new(req, params, body)).unwrap();
-    ///     let res_body_bytes = serde_json::to_vec(&res).unwrap();
-    ///     
-    ///     let mut res = http_types::Response::new(StatusCode::Ok);
-    ///     res.set_body(res_body_bytes);
-    ///     let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
-    ///     res
-    /// }
+    /// A route in the router is composed of an `http-types::Method`, a
+    /// [`Route`](struct.Route.html), an endpoint and a service.  
     ///
+    /// ## Examples
+    /// ```
     /// async fn example(req: Req<String>) -> Result<String, Error> {
     ///     Ok(String::from("greetings"))
     /// }
@@ -64,6 +43,21 @@ impl Router {
     /// router.add(Method::Get, route!(/"example"), example, service);
     /// router.add(Method::Get, route!(/"example2"), example2, service);
     /// ```
+    ///
+    /// ## Precedence and ambiguity
+    ///
+    /// When adding routes to the router the order they are added in is sometimes important.  
+    /// ```
+    /// router.add(Method::Get, route!(/a/b/c, example, service);
+    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
+    /// ```
+    /// In the example above the second route will never get run because the first route matches
+    /// the literal "a" as a dynamic segment.  To solve this simply insert _more specific_
+    /// routes before _less specific_ routes as seen in the example below.  
+    /// ```
+    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
+    /// router.add(Method::Get, route!(/a/b/c, example, service);
+    /// ```
     pub fn add<Body, Res, E, S>(
         &mut self,
         method: Method,
@@ -71,8 +65,6 @@ impl Router {
         endpoint: E,
         service: S,
     ) where
-        Body: for<'de> Deserialize<'de> + 'static + Send + Sync,
-        Res: Serialize + 'static + Send + Sync,
         E: Endpoint<Body, Res> + Send + Sync,
         S: Service<Body, Res, E> + Send + Sync,
     {

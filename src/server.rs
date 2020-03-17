@@ -13,6 +13,9 @@ pub struct Server {
 }
 
 impl Server {
+    /// Create a new `Server`.
+    ///
+    /// ## Examples
     /// ```
     /// let config = Config::new("127.0.0.1:4000");
     /// let server = Server::new(config);
@@ -21,6 +24,9 @@ impl Server {
         Self { config }
     }
 
+    /// Start accepting requests on the server using the provided router.  
+    ///
+    /// ## Examples
     /// ```
     /// let mut router = Router::new();
     /// let config = Config::new("127.0.0.1:4000");
