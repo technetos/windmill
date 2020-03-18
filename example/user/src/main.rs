@@ -2,7 +2,7 @@
 
 use enzyme::*;
 
-use http_types::{headers, Method, StatusCode};
+use http_types::{headers, mime, Method, Mime, StatusCode};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -64,32 +64,35 @@ where
     Body: for<'de> Deserialize<'de>,
     Res: Serialize,
 {
-    let body = read_body(&mut req).await;
+    let body = serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
 
-    let req_body: Option<Body> = serde_json::from_slice(&body).unwrap_or_else(|_| None);
-
-    let res_body: Res = match endpoint.call(Req::new(req, req_body, params)).await {
-        Ok(res_body) => res_body,
-        Err(e) => {
-            let mut res = http_types::Response::new(e.code());
-            let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+    let maybe_bytes = endpoint
+        .call(Req::new(req, body, params))
+        .await
+        .map_err(|e| {
+            let mut res = response(e.code(), mime::JSON);
             res.set_body(serde_json::to_vec(e.msg()).unwrap());
-            return res;
-        }
-    };
+            res
+        })
+        .map(|body| serde_json::to_vec(&body));
 
-    let res_body_bytes = match serde_json::to_vec(&res_body) {
-        Ok(res_body_bytes) => res_body_bytes,
-        Err(e) => {
-            let mut res = http_types::Response::new(StatusCode::InternalServerError);
-            let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+    match maybe_bytes {
+        Ok(Ok(bytes)) => {
+            let mut res = response(StatusCode::Ok, mime::JSON);
+            res.set_body(bytes);
+            res
+        }
+        Ok(Err(e)) => {
+            let mut res = response(StatusCode::InternalServerError, mime::JSON);
             res.set_body(serde_json::to_vec(&format!("{}", e)).unwrap());
-            return res;
+            res
         }
-    };
+        Err(res) => res,
+    }
+}
 
-    let mut res = http_types::Response::new(StatusCode::Ok);
-    res.set_body(res_body_bytes);
-    let _ = res.insert_header(http_types::headers::CONTENT_TYPE, "application/json");
+fn response(code: StatusCode, mime: Mime) -> http_types::Response {
+    let mut res = http_types::Response::new(code);
+    let _ = res.set_content_type(mime);
     res
 }
