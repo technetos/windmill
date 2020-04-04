@@ -88,29 +88,27 @@ impl Router {
     ) -> Box<dyn Future<Output = http_types::Response> + Unpin + Send + Sync> {
         let method = req.method();
         let raw_route = RawRoute::from_path(req.url().path().into());
-        let maybe_route = if let Some(routes) = self.table.get(&method) {
-            routes.iter().find(|route| paths_match(route, &raw_route))
-        } else {
-            return Box::new(Box::pin(not_found()));
-        };
 
-        if let Some(route) = maybe_route {
-            let params = route.dynamic_segments.iter().fold(
-                HashMap::new(),
-                |mut params, dynamic_segment| {
+        match self
+            .table
+            .get(&method)
+            .map(|routes| routes.iter().find(|route| paths_match(route, &raw_route)))
+        {
+            Some(Some(route)) => {
+                let mut params = HashMap::new();
+
+                route.dynamic_segments.iter().for_each(|dynamic_segment| {
                     params.insert(
                         dynamic_segment.name,
                         raw_route.raw_segments[dynamic_segment.position]
                             .value
                             .into(),
                     );
-                    params
-                },
-            );
+                });
 
-            Box::new((route.handler.as_ref().unwrap())(req, params))
-        } else {
-            Box::new(Box::pin(not_found()))
+                Box::new((route.handler.as_ref().unwrap())(req, params))
+            }
+            _ => Box::new(Box::pin(not_found())),
         }
     }
 }

@@ -13,4 +13,3 @@ pub async fn read_body(req: &mut http_types::Request) -> Vec<u8> {
     }
     body
 }
-

@@ -1,9 +1,9 @@
 use crate::{config::Config, router::Router};
-
-use async_std::net::{TcpListener, TcpStream};
-use async_std::prelude::*;
-use async_std::task;
-
+use async_std::{
+    net::{TcpListener, TcpStream},
+    prelude::*,
+    task,
+};
 use http_types::Error;
 use std::sync::Arc;
 
