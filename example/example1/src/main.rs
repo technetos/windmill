@@ -1,14 +1,14 @@
 #![feature(proc_macro_hygiene)]
 
 mod service;
-use service::{service, auth_service};
+use service::{auth_service, service};
 
-use enzyme::*;
+use windmill::*;
 
-use http_types::{mime, Method, Mime, StatusCode};
-use serde::{Deserialize, Serialize};
+use http_types::{Method, StatusCode};
+use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ExampleRequest {
     foo: String,
 }
@@ -42,16 +42,16 @@ async fn example_route(req: Req<ExampleRequest>) -> Result<(u64, String), Error>
         msg: serde_json::json!("body required"),
     })?;
 
-    dbg!(body);
-
     Ok((id, String::new()))
 }
 
-async fn hello(req: Req<ExampleRequest>) -> Result<String, Error> {
+async fn hello(req: Req<Vec<String>>) -> Result<String, Error> {
     let name = req.params().get("name").ok_or_else(|| Error {
         code: StatusCode::InternalServerError,
         msg: serde_json::json!("param does not exist"),
     })?;
+
+    dbg!(req.body());
 
     Ok(format!("Greetings {}!", name))
 }

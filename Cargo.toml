@@ -1,5 +1,5 @@
 [package]
-name = "enzyme"
+name = "windmill"
 version = "0.1.0"
 authors = ["technetos <mrgould93@gmail.com>"]
 edition = "2018"

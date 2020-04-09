@@ -1,56 +1,51 @@
-use enzyme::*;
-use http_types::{mime, Mime, StatusCode};
+use http_types::{headers::HeaderName, mime, Mime, StatusCode};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use windmill::*;
 
 pub async fn service<Body, Res>(
     mut req: http_types::Request,
     params: Params,
     endpoint: impl Endpoint<Body, Res>,
-) -> http_types::Response
+) -> Result<http_types::Response, Error>
 where
     Body: for<'de> Deserialize<'de>,
     Res: Serialize,
 {
     let body = serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
+    let res_body = endpoint.call(Req::new(req, body, params)).await?;
 
-    let maybe_bytes = endpoint
-        .call(Req::new(req, body, params))
-        .await
-        .map(|body| serde_json::to_vec(&body));
+    let bytes = serde_json::to_vec(&res_body).map_err(|e| Error {
+        code: StatusCode::InternalServerError,
+        msg: json!(&format!("{}", e)),
+    })?;
 
-    match maybe_bytes {
-        Ok(Ok(bytes)) => {
-            let mut res = response(StatusCode::Ok, mime::JSON);
-            res.set_body(bytes);
-            res
-        }
-        Ok(Err(e)) => {
-            let mut res = response(StatusCode::InternalServerError, mime::JSON);
-            res.set_body(serde_json::to_vec(&format!("{}", e)).unwrap());
-            res
-        }
-        Err(e) => {
-            let mut res = response(e.code(), mime::JSON);
-            res.set_body(serde_json::to_vec(e.msg()).unwrap());
-            res
-        }
-    }
+    let mut res = response(StatusCode::Ok, mime::JSON);
+    res.set_body(bytes);
+    Ok(res)
 }
 
 pub async fn auth_service<Body, Res>(
     req: http_types::Request,
     params: Params,
     endpoint: impl Endpoint<Body, Res>,
-) -> http_types::Response
+) -> Result<http_types::Response, Error>
 where
     Body: for<'de> Deserialize<'de>,
     Res: Serialize,
 {
     use std::str::FromStr;
-    if req.header(&http_types::headers::HeaderName::from_str("authorization").unwrap()).is_none() {
-        return http_types::Response::new(StatusCode::BadRequest);
-    }
-    service(req, params, endpoint).await    
+    let header_name = HeaderName::from_str("authorization").map_err(|header_name| Error {
+        code: StatusCode::InternalServerError,
+        msg: json!("bad header name"),
+    })?;
+
+    let header = req.header(&header_name).ok_or_else(|| Error {
+        code: StatusCode::BadRequest,
+        msg: json!("authorization required"),
+    })?;
+
+    service(req, params, endpoint).await
 }
 
 fn response(code: StatusCode, mime: Mime) -> http_types::Response {
