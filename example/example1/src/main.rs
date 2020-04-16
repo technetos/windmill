@@ -20,6 +20,7 @@ fn main() {
 
     #[rustfmt::skip]
     router.add(Method::Get, route!(/"example"/id), ___example_route);
+    router.add(Method::Get, route!(/"hello"/name), ___hello);
 
     if let Err(e) = Server::new(config).run(router) {
         println!("{}", e);
@@ -31,7 +32,7 @@ struct Auth {
     token: String,
 }
 
-fn parse_header<'h>(req: &'h http_types::Request) -> Result<String, Error> {
+fn parse_header(req: &http_types::Request) -> Result<String, Error> {
     use std::str::FromStr;
     let header_name =
         HeaderName::from_str("authorization").map_err(|header_name| Error {
@@ -102,23 +103,12 @@ async fn example_route(
     //        msg: serde_json::json!(format!("{}", e)),
     //    })?;
     //
-    //    //    let body = req.body().ok_or_else(|| Error {
-    //    //        code: StatusCode::BadRequest,
-    //    //        msg: serde_json::json!("body required"),
-    //    //    })?;
-    //
-    //    let auth = req
-    //        .context()
-    //        .get("auth")
-    //        .ok_or_else(|| Error {
-    //            code: StatusCode::InternalServerError,
-    //            msg: serde_json::json!("context value auth does not exist"),
-    //        })?
-    //        .downcast_ref::<http_types::headers::HeaderValue>()
-    //        .ok_or_else(|| Error {
-    //            code: StatusCode::InternalServerError,
-    //            msg: serde_json::json!("invalid cast to HeaderValue"),
-    //        })?;
-    //
     Ok(http_types::Response::new(StatusCode::Ok))
 }
+
+#[endpoint]
+async fn hello(body: Body<String>) -> Result<http_types::Response, Error> {
+    dbg!(body.inner);
+    Ok(http_types::Response::new(StatusCode::Ok))
+}
+

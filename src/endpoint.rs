@@ -7,7 +7,7 @@ pub trait Endpoint: 'static + Copy {
     fn call(&self, req: http_types::Request, params: Params) -> Self::Fut;
 }
 
-/// A blanket impl over async functions.  
+/// A blanket impl over the generated hidden functions for endpoints.  
 impl<F, G> Endpoint for F
 where
     F: Fn(http_types::Request, Params) -> G + Copy + 'static,
