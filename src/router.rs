@@ -4,7 +4,7 @@ use crate::{
     route::{RawRoute, ResponseFuture, Route},
     service::Service,
 };
-use http_types::{Method, StatusCode};
+use http_types::{mime, Method, Mime, StatusCode};
 use std::{collections::HashMap, future::Future, sync::Arc};
 
 /// ## Router
@@ -89,13 +89,7 @@ impl Router {
     /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
     /// router.add(Method::Get, route!(/a/b/c, example, service);
     /// ```
-    pub fn add(
-        &mut self,
-        method: Method,
-        mut route: Route,
-        endpoint: impl Endpoint + Send + Sync,
-    ) where
-    {
+    pub fn add(&mut self, method: Method, mut route: Route, endpoint: impl Endpoint + Send + Sync) {
         let entry = self
             .table
             .entry(method)
@@ -103,7 +97,17 @@ impl Router {
 
         // haha type erasure is awesome
         let handler = move |req: http_types::Request, params: Params| -> ResponseFuture {
-            Box::pin(async move { endpoint.call(req, params).await.unwrap() })
+            Box::pin(async move {
+                match endpoint.call(req, params).await {
+                    Ok(res) => res,
+                    Err(e) => {
+                        let mut res = response(e.code(), mime::JSON);
+                        let bytes = serde_json::to_vec(e.msg()).unwrap();
+                        res.set_body(bytes);
+                        res
+                    }
+                }
+            })
         };
 
         route.handler = Some(Box::new(handler));
@@ -170,4 +174,10 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 
 async fn not_found() -> http_types::Response {
     http_types::Response::new(StatusCode::NotFound)
+}
+
+fn response(code: StatusCode, mime: Mime) -> http_types::Response {
+    let mut res = http_types::Response::new(code);
+    let _ = res.set_content_type(mime);
+    res
 }

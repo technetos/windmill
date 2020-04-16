@@ -99,7 +99,7 @@ pub use crate::{
     route::{DynamicSegment, Route, StaticSegment},
     router::Router,
     server::Server,
-    service::Service,
+    service::{Service, ServiceFuture},
     state::State,
     util::read_body,
 };

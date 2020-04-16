@@ -5,8 +5,8 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    PatIdent, Pat, parenthesized, parse_macro_input, punctuated::Punctuated, FnArg, Generics, Ident, LitInt,
-    LitStr, PatType, Result, Token, Type, TypePath, Visibility,
+    parenthesized, parse_macro_input, punctuated::Punctuated, FnArg, Generics, Ident, LitInt,
+    LitStr, Pat, PatIdent, PatType, Result, Token, Type, TypePath, Visibility,
 };
 
 trait LitIntExt {
@@ -241,12 +241,12 @@ impl Parse for Endpoint {
             let ty = &service.ty;
 
             let service_call = quote! {
-                let #ident: #ty = <#ty as Service>::call(req.clone(), params.clone()).await?;
+                let (req, params, #ident) =
+                    <#ty as Service>::call(req, params).await?;
             };
             service_calls.push(service_call);
             args.push(quote!(#ident));
         }
-
 
         let generated_service_calls = quote! {
             #(
@@ -258,16 +258,6 @@ impl Parse for Endpoint {
             Ok(#fn_name(#(#args),*).await?)
         };
 
-        while !input.is_empty() {
-            let _ = input.step(|cursor| {
-                let mut rest = *cursor;
-                while let Some((tt, next)) = rest.token_tree() {
-                    rest = next;
-                }
-                Ok(((), rest))
-            });
-        }
-
         let hidden_fn_name = fn_name.prepend("___");
 
         let endpoint_fn = quote! {
@@ -275,12 +265,21 @@ impl Parse for Endpoint {
                 req: http_types::Request,
                 params: Params
             ) -> Result<http_types::Response, Error> {
-                let req = std::sync::Arc::new(req);
-                let params = std::sync::Arc::new(params);
                 #generated_service_calls
                 #generated_endpoint_call
             }
         };
+
+        while !input.is_empty() {
+            let _ = input.step(|cursor| {
+                let mut rest = *cursor;
+                while let Some((_, next)) = rest.token_tree() {
+                    rest = next;
+                }
+                Ok(((), rest))
+            });
+        }
+
 
         Ok(Self {
             tokens: endpoint_fn,
@@ -303,4 +302,3 @@ pub fn endpoint(attrs: TokenStream, tokens: TokenStream) -> TokenStream {
 
     output.into()
 }
-
