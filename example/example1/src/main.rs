@@ -31,34 +31,41 @@ struct Auth {
     token: String,
 }
 
+fn parse_header<'h>(req: &'h http_types::Request) -> Result<String, Error> {
+    use std::str::FromStr;
+    let header_name =
+        HeaderName::from_str("authorization").map_err(|header_name| Error {
+            code: StatusCode::InternalServerError,
+            msg: json!("bad header name"),
+        })?;
+
+    let header = req.header(&header_name).ok_or_else(|| Error {
+        code: StatusCode::BadRequest,
+        msg: json!("authorization required"),
+    })?;
+
+    let header = header.first().as_ref().unwrap().to_string();
+
+    Ok(header)
+}
+
+
 impl Service for Auth {
     type Fut = ServiceFuture<Self>;
     fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
-            use std::str::FromStr;
-            let header_name =
-                HeaderName::from_str("authorization").map_err(|header_name| Error {
-                    code: StatusCode::InternalServerError,
-                    msg: json!("bad header name"),
-                })?;
-
-            let header = req.header(&header_name).ok_or_else(|| Error {
-                code: StatusCode::BadRequest,
-                msg: json!("authorization required"),
-            })?;
-
-            let header = header.first().unwrap();
+            let header = parse_header(&req)?;
 
             Ok((req, params, Self {
                 user_id: 1,
-                token: String::new(),
+                token: header,
             }))
         })
     }
 }
 
 struct Body<T> {
-    t: Option<T>,
+    inner: Option<T>,
 }
 
 impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Service for Body<T> {
@@ -68,9 +75,7 @@ impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Service for Body<T> {
             let body: Option<T> =
                 serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
 
-            dbg!(&body);
-
-            Ok((req, params, Body { t: body }))
+            Ok((req, params, Body { inner: body }))
         })
     }
 }
@@ -80,6 +85,13 @@ async fn example_route(
     auth: Auth,
     body: Body<ExampleRequest>,
 ) -> Result<http_types::Response, Error> {
+
+    let body = body.inner.ok_or_else(|| Error {
+        code: StatusCode::BadRequest,
+        msg: serde_json::json!("body required"),
+    })?;
+
+    dbg!(&body);
     //    use std::str::FromStr;
     //    let id = u64::from_str(req.params().get("id").ok_or_else(|| Error {
     //        code: StatusCode::InternalServerError,
