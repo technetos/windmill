@@ -47,6 +47,21 @@
 //! }
 //!
 //! ```
+//! # Windmill
+//!
+//! ## Async functions
+//! In rust async functions are functions that start with the keyword `async`
+//! and return a `Future` that eventually yeilds the specified return type.
+//!
+//! ## Traits
+//!
+//! ### Service
+//!
+//! #### Base service function
+//! #### Composite service functions
+//!
+//! ### Endpoint
+//!
 
 mod config;
 mod endpoint;
@@ -56,9 +71,11 @@ mod route;
 mod router;
 mod server;
 mod service;
+mod state;
 mod util;
 
 mod codegen {
+    pub use codegen::endpoint;
     pub use codegen::route;
 }
 
@@ -66,9 +83,15 @@ mod params {
     pub type Params = std::collections::HashMap<&'static str, String>;
 }
 
+mod context {
+    pub type Context =
+        std::collections::HashMap<&'static str, Box<dyn std::any::Any + Send + Sync>>;
+}
+
 pub use crate::{
-    codegen::route,
+    codegen::{endpoint, route},
     config::Config,
+    context::Context,
     endpoint::Endpoint,
     error::Error,
     params::Params,
@@ -77,5 +100,6 @@ pub use crate::{
     router::Router,
     server::Server,
     service::Service,
+    state::State,
     util::read_body,
 };

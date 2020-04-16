@@ -3,17 +3,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use windmill::*;
 
-pub async fn service<Body, Res>(
+pub async fn service<Payload, Res>(
     mut req: http_types::Request,
     params: Params,
-    endpoint: impl Endpoint<Body, Res>,
+    endpoint: impl Endpoint<Payload, Res>,
+    context: Context,
 ) -> Result<http_types::Response, Error>
 where
-    Body: for<'de> Deserialize<'de>,
+    Payload: for<'de> Deserialize<'de>,
     Res: Serialize,
 {
     let body = serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
-    let res_body = endpoint.call(Req::new(req, body, params)).await?;
+    let res_body = endpoint.call(Req::new(req, body, params, context)).await?;
 
     let bytes = serde_json::to_vec(&res_body).map_err(|e| Error {
         code: StatusCode::InternalServerError,
@@ -25,13 +26,14 @@ where
     Ok(res)
 }
 
-pub async fn auth_service<Body, Res>(
+pub async fn auth_service<Payload, Res>(
     req: http_types::Request,
     params: Params,
-    endpoint: impl Endpoint<Body, Res>,
+    endpoint: impl Endpoint<Payload, Res>,
+    mut context: Context,
 ) -> Result<http_types::Response, Error>
 where
-    Body: for<'de> Deserialize<'de>,
+    Payload: for<'de> Deserialize<'de>,
     Res: Serialize,
 {
     use std::str::FromStr;
@@ -45,7 +47,12 @@ where
         msg: json!("authorization required"),
     })?;
 
-    service(req, params, endpoint).await
+    if let Some(header) = header.first() {
+        async_std::task::spawn(async {}).await;
+        context.insert("auth", Box::new(header.clone()));
+    }
+
+    service(req, params, endpoint, context).await
 }
 
 fn response(code: StatusCode, mime: Mime) -> http_types::Response {

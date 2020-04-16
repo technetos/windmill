@@ -5,7 +5,8 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    parse_macro_input, Ident, LitInt, LitStr, Result, Token,
+    PatIdent, Pat, parenthesized, parse_macro_input, punctuated::Punctuated, FnArg, Generics, Ident, LitInt,
+    LitStr, PatType, Result, Token, Type, TypePath, Visibility,
 };
 
 trait LitIntExt {
@@ -15,6 +16,16 @@ trait LitIntExt {
 }
 
 impl LitIntExt for LitInt {}
+
+trait IdentExt {
+    fn prepend(&self, string: &str) -> Ident;
+}
+
+impl IdentExt for syn::Ident {
+    fn prepend(&self, string: &str) -> Ident {
+        Ident::new(&format!("{}{}", string, self), self.span())
+    }
+}
 
 #[derive(Debug)]
 struct Route {
@@ -96,14 +107,12 @@ impl Route {
     fn static_segments(&self) -> proc_macro2::TokenStream {
         let mut static_segments = vec![];
 
-        self.segments.iter().for_each(|segment| {
-            match segment {
-                Segment::Static(static_segment) => {
-                    let content = &static_segment.content;
-                    static_segments.push(quote!(#content));
-                }
-                _ => {}
+        self.segments.iter().for_each(|segment| match segment {
+            Segment::Static(static_segment) => {
+                let content = &static_segment.content;
+                static_segments.push(quote!(#content));
             }
+            _ => {}
         });
 
         let static_positions = &self.static_segment_positions;
@@ -129,14 +138,12 @@ impl Route {
     fn dynamic_segments(&self) -> proc_macro2::TokenStream {
         let mut dynamic_segment_names = vec![];
 
-        self.segments.iter().for_each(|segment| {
-            match segment {
-                Segment::Dynamic(dynamic_segment) => {
-                    let name = &dynamic_segment.field_name.to_string();
-                    dynamic_segment_names.push(quote!(#name));
-                }
-                _ => {}
+        self.segments.iter().for_each(|segment| match segment {
+            Segment::Dynamic(dynamic_segment) => {
+                let name = &dynamic_segment.field_name.to_string();
+                dynamic_segment_names.push(quote!(#name));
             }
+            _ => {}
         });
 
         let dynamic_positions = &self.dynamic_segment_positions;
@@ -188,3 +195,112 @@ pub fn route(tokens: TokenStream) -> TokenStream {
 
     output.into()
 }
+
+#[derive(Debug)]
+struct Service {
+    ident: proc_macro2::TokenStream,
+    ty: proc_macro2::TokenStream,
+}
+
+#[derive(Debug)]
+struct Endpoint {
+    tokens: proc_macro2::TokenStream,
+}
+
+impl Parse for Endpoint {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let _visibility: Visibility = input.parse()?;
+        let _async: Option<Token![async]> = input.parse()?;
+        let _fn: Token![fn] = input.parse()?;
+        let fn_name: Ident = input.parse()?;
+        let _generics: Generics = input.parse()?;
+        let content;
+        let _paren = parenthesized!(content in input);
+        let args: Punctuated<FnArg, Token![,]> = content.parse_terminated(FnArg::parse)?;
+
+        let mut services = vec![];
+
+        for arg in args {
+            if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
+                if let Type::Path(TypePath { path, .. }) = *ty {
+                    if let Pat::Ident(PatIdent { ident, .. }) = *pat {
+                        services.push(Service {
+                            ident: quote!(#ident),
+                            ty: quote!(#path),
+                        });
+                    }
+                }
+            }
+        }
+
+        let mut args = vec![];
+        let mut service_calls = vec![];
+
+        for service in &services {
+            let ident = &service.ident;
+            let ty = &service.ty;
+
+            let service_call = quote! {
+                let #ident: #ty = <#ty as Service>::call(req.clone(), params.clone()).await?;
+            };
+            service_calls.push(service_call);
+            args.push(quote!(#ident));
+        }
+
+
+        let generated_service_calls = quote! {
+            #(
+                #service_calls
+            )*
+        };
+
+        let generated_endpoint_call = quote! {
+            Ok(#fn_name(#(#args),*).await?)
+        };
+
+        while !input.is_empty() {
+            let _ = input.step(|cursor| {
+                let mut rest = *cursor;
+                while let Some((tt, next)) = rest.token_tree() {
+                    rest = next;
+                }
+                Ok(((), rest))
+            });
+        }
+
+        let hidden_fn_name = fn_name.prepend("___");
+
+        let endpoint_fn = quote! {
+            async fn #hidden_fn_name(
+                req: http_types::Request,
+                params: Params
+            ) -> Result<http_types::Response, Error> {
+                let req = std::sync::Arc::new(req);
+                let params = std::sync::Arc::new(params);
+                #generated_service_calls
+                #generated_endpoint_call
+            }
+        };
+
+        Ok(Self {
+            tokens: endpoint_fn,
+        })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn endpoint(attrs: TokenStream, tokens: TokenStream) -> TokenStream {
+    let tokens_clone = tokens.clone();
+    let input = parse_macro_input!(tokens_clone as Endpoint);
+
+    let endpoint_fn = input.tokens;
+    let tokens2: proc_macro2::TokenStream = tokens.into();
+
+    let output = quote! {
+        #endpoint_fn
+        #tokens2
+    };
+
+    output.into()
+}
+

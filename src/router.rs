@@ -7,6 +7,37 @@ use crate::{
 use http_types::{Method, StatusCode};
 use std::{collections::HashMap, future::Future, sync::Arc};
 
+/// ## Router
+///
+/// This is the router provided by windmill for routing requests.  
+///
+/// A route is composed of 4 parts:
+///
+/// + Methods
+///
+/// Methods in rust use `http_types::Method` variants like `Get` and `Post`.
+///
+/// + Routes
+///
+/// Routes are generated using the `route!` macro.  See the module level documentation.  
+///
+/// + Endpoints
+///
+/// Endpoints are functions that match the signature or similar of the function below:
+/// ```rust
+///
+/// async fn example_route(req: Req<ExampleRequest>) -> Result<String, Error> {
+///     ...
+///     ...
+///     Ok(String::from("Hello!"))
+/// }
+///
+/// ```
+///
+/// + Services
+///
+/// See the main document on Services for more general information.  
+///
 /// A router for dispatching requests to endpoints.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
@@ -58,15 +89,12 @@ impl Router {
     /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
     /// router.add(Method::Get, route!(/a/b/c, example, service);
     /// ```
-    pub fn add<Body, Res, E, S>(
+    pub fn add(
         &mut self,
         method: Method,
         mut route: Route,
-        endpoint: E,
-        service: S,
+        endpoint: impl Endpoint + Send + Sync,
     ) where
-        E: Endpoint<Body, Res> + Send + Sync,
-        S: Service<Body, Res, E> + Send + Sync,
     {
         let entry = self
             .table
@@ -75,7 +103,7 @@ impl Router {
 
         // haha type erasure is awesome
         let handler = move |req: http_types::Request, params: Params| -> ResponseFuture {
-            Box::pin(service.call(req, params, endpoint))
+            Box::pin(async move { endpoint.call(req, params).await.unwrap() })
         };
 
         route.handler = Some(Box::new(handler));
