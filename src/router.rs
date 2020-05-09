@@ -7,38 +7,10 @@ use crate::{
 use http_types::{mime, Method, Mime, StatusCode};
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-/// ## Router
+/// The router for routing requests.  
 ///
-/// This is the router provided by windmill for routing requests.  
-///
-/// A route is composed of 4 parts:
-///
-/// + Methods
-///
-/// Methods in rust use `http_types::Method` variants like `Get` and `Post`.
-///
-/// + Routes
-///
-/// Routes are generated using the `route!` macro.  See the module level documentation.  
-///
-/// + Endpoints
-///
-/// Endpoints are functions that match the signature or similar of the function below:
-/// ```rust
-///
-/// async fn example_route(req: Req<ExampleRequest>) -> Result<String, Error> {
-///     ...
-///     ...
-///     Ok(String::from("Hello!"))
-/// }
-///
-/// ```
-///
-/// + Services
-///
-/// See the main document on Services for more general information.  
-///
-/// A router for dispatching requests to endpoints.  
+/// A route in the router is composed of an `http-types::Method`, a
+/// [`Route`](struct.Route.html), and an endpoint.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
@@ -56,38 +28,37 @@ impl Router {
         }
     }
 
-    /// A route in the router is composed of an `http-types::Method`, a
-    /// [`Route`](struct.Route.html), an endpoint and a service.  
-    ///
     /// ## Examples
     /// ```
-    /// async fn example(req: Req<String>) -> Result<String, Error> {
+    /// #[endpoint]
+    /// async fn example() -> Result<String, Error> {
     ///     Ok(String::from("greetings"))
     /// }
     ///
-    /// async fn example2(req: Req<u64>) -> Result<(), Error> {
+    /// #[endpoint]
+    /// async fn example2() -> Result<(), Error> {
     ///     Ok(())
     /// }
     ///
     /// let mut router = Router::new();
     ///
-    /// router.add(Method::Get, route!(/"example"), example, service);
-    /// router.add(Method::Get, route!(/"example2"), example2, service);
+    /// router.add(Method::Get, route!(/"example"), ___example);
+    /// router.add(Method::Get, route!(/"example2"), ___example2);
     /// ```
     ///
     /// ## Precedence and ambiguity
     ///
     /// When adding routes to the router the order they are added in is sometimes important.  
     /// ```
-    /// router.add(Method::Get, route!(/a/b/c, example, service);
-    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
+    /// router.add(Method::Get, route!(/a/b/c), ___example);
+    /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
     /// ```
     /// In the example above the second route will never get run because the first route matches
-    /// the literal "a" as a dynamic segment.  To solve this simply insert _more specific_
+    /// the literal `"a"` as a dynamic segment.  To solve this simply insert _more specific_
     /// routes before _less specific_ routes as seen in the example below.  
     /// ```
-    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
-    /// router.add(Method::Get, route!(/a/b/c, example, service);
+    /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
+    /// router.add(Method::Get, route!(/a/b/c), ___example);
     /// ```
     pub fn add(&mut self, method: Method, mut route: Route, endpoint: impl Endpoint + Send + Sync) {
         let entry = self
@@ -95,7 +66,6 @@ impl Router {
             .entry(method)
             .or_insert_with(|| Vec::<Route>::new());
 
-        // haha type erasure is awesome
         let handler = move |req: http_types::Request, params: Params| -> ResponseFuture {
             Box::pin(async move {
                 match endpoint.call(req, params).await {

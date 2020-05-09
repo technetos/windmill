@@ -27,6 +27,30 @@ fn main() {
     }
 }
 
+#[endpoint]
+async fn example_route(
+    auth: Auth,
+    id: Id,
+    body: Body<ExampleRequest>,
+) -> Result<http_types::Response, Error> {
+
+    let body = body.inner.ok_or_else(|| Error {
+        code: StatusCode::BadRequest,
+        msg: serde_json::json!("body required"),
+    })?;
+
+    dbg!(&body);
+
+    dbg!(id.id);
+
+    Ok(http_types::Response::new(StatusCode::Ok))
+}
+
+#[endpoint]
+async fn hello() -> Result<http_types::Response, Error> {
+    Ok(http_types::Response::new(StatusCode::Ok))
+}
+
 struct Auth {
     user_id: u64,
     token: String,
@@ -65,6 +89,29 @@ impl Service for Auth {
     }
 }
 
+struct Id {
+    id: u64,
+}
+
+impl Service for Id {
+    type Fut = ServiceFuture<Self>;
+    fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
+        Box::pin(async move {
+            use std::str::FromStr;
+            let id = u64::from_str(params.get("id").ok_or_else(|| Error {
+                code: StatusCode::InternalServerError,
+                msg: serde_json::json!("param does not exist"),
+            })?)
+            .map_err(|e| Error {
+                code: StatusCode::BadRequest,
+                msg: serde_json::json!(format!("{}", e)),
+            })?;
+
+            Ok((req, params, Self { id }))
+        })
+    }
+}
+
 struct Body<T> {
     inner: Option<T>,
 }
@@ -79,36 +126,5 @@ impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Service for Body<T> {
             Ok((req, params, Body { inner: body }))
         })
     }
-}
-
-#[endpoint]
-async fn example_route(
-    auth: Auth,
-    body: Body<ExampleRequest>,
-) -> Result<http_types::Response, Error> {
-
-    let body = body.inner.ok_or_else(|| Error {
-        code: StatusCode::BadRequest,
-        msg: serde_json::json!("body required"),
-    })?;
-
-    dbg!(&body);
-    //    use std::str::FromStr;
-    //    let id = u64::from_str(req.params().get("id").ok_or_else(|| Error {
-    //        code: StatusCode::InternalServerError,
-    //        msg: serde_json::json!("param does not exist"),
-    //    })?)
-    //    .map_err(|e| Error {
-    //        code: StatusCode::BadRequest,
-    //        msg: serde_json::json!(format!("{}", e)),
-    //    })?;
-    //
-    Ok(http_types::Response::new(StatusCode::Ok))
-}
-
-#[endpoint]
-async fn hello(body: Body<String>) -> Result<http_types::Response, Error> {
-    dbg!(body.inner);
-    Ok(http_types::Response::new(StatusCode::Ok))
 }
 

@@ -1,4 +1,4 @@
-use crate::{error::Error, req::Req, Params};
+use crate::{error::Error, Params};
 use std::{future::Future, pin::Pin};
 
 /// A trait for things that can be used as routes.  

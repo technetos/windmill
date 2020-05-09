@@ -1,45 +1,72 @@
 //! # Windmill
-//!
 //! A simple to use async web server framework.  
 //!
-//! A core concept in windmill is automatic deserialization and serialization of user defined
-//! request and response types.  Currently all requests and response bodies are JSON only.  Making
-//! this pluggable is a future goal.  
+//! ## Async functions
+//! In rust async functions are functions that start with the keyword `async`
+//! and return a `Future` that eventually yeilds the specified return type.  Functions that return
+//! futures can be awaited upon with the `.await` syntax.  
 //!
-//! The `Content-Length` header is required in any requests containing a body that
-//! you wish to be automatically deserialized.  A `Content-Length` of 0 will prevent
-//! deserialization of the body entirely.   
+//! ## Endpoint
+//! Endpoints are async functions that match the signature or similar of the function below:
+//! ```
+//! #[endpoint]
+//! async fn example_route() -> Result<String, Error> {
+//!     ...
+//!     ...
+//!     Ok(String::from("Hello!"))
+//! }
+//! ```
+//! ## Service
+//! Services are asynchronously constructed components that are passed into endpoints as function
+//! arguments.  
 //!
-//! # Basic Usage
+//! We can pass in a service to the `example_route` above by modifying it to take an argument:
+//! ```
+//! #[endpoint]
+//! async fn example_route(body: Body<String>) -> Result<String, Error> {
+//!     ...
+//!     ...
+//!     Ok(String::from("Hello!"))
+//! }
+//! ```
+//! ### Create your own service
+//! In the example above the `Body` service could be implemented as follows: 
+//! ```
+//! struct Body<T> {
+//!     inner: Option<T>,
+//! }
+//! 
+//! impl<T: for<'de> Deserialize<'de>> Service for Body<T> {
+//!     type Fut = ServiceFuture<Self>;
+//!
+//!     fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
+//!         Box::pin(async move {
+//!             let body: Option<T> =
+//!                 serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
+//! 
+//!             Ok((req, params, Body { inner: body }))
+//!         })
+//!     }
+//! }
+//! ```
+//! Services have access to the raw request and the params for the route.  Anything data stored
+//! within the request or the params can be made available to an endpoint via a service.  
+//!
+//! Before `example_route` is invoked, an instance of the `Body` service is constructed using the
+//! `call` method above.  Constructing an instance of the `Body` service parses the body from the
+//! request and returns `Self`, this instance is then passed in as an argument to `example_route`.
+//!
+//! In this example we have made the parsed JSON body available to the endpoint through the `body`
+//! argument.
+//!
+//! # Examples
 //!
 //! ```
-//!
-//! #[derive(Deserialize)]
-//! struct ExampleBody<'s> {
-//!     name: &'s str,
-//! }
-//!
-//! #[derive(Serialize)]
-//! struct ExampleResponse {
-//!     greeting: String,
-//! }
-//!
-//! async fn example(req: Req<ExampleBody>) -> Result<ExampleResponse, Error> {
-//!     let body = req.body().ok_or_else(|| Error {
-//!         code: StatusCode::BadRequest,
-//!         msg: json!("body required"),
-//!     })?;
-//!
-//!     Ok(ExampleResponse {
-//!         greeting: format!("Greetings {}!", body.name),
-//!     })
-//! }
-//!
 //! fn main() {
 //!     let mut router = Router::new();
 //!     let config = Config::new("127.0.0.1:4000");
 //!
-//!     router.add(Method::Get, route!(/"example"), example, service);
+//!     router.add(Method::Get, route!(/"example"), ___example_route);
 //!
 //!     if let Err(e) = Server::new(config).run(router) {
 //!         println!("{}", e);
@@ -47,31 +74,14 @@
 //! }
 //!
 //! ```
-//! # Windmill
-//!
-//! ## Async functions
-//! In rust async functions are functions that start with the keyword `async`
-//! and return a `Future` that eventually yeilds the specified return type.
-//!
-//! ## Traits
-//!
-//! ### Service
-//!
-//! #### Base service function
-//! #### Composite service functions
-//!
-//! ### Endpoint
-//!
 
 mod config;
 mod endpoint;
 mod error;
-mod req;
 mod route;
 mod router;
 mod server;
 mod service;
-mod state;
 mod util;
 
 mod codegen {
@@ -83,23 +93,15 @@ mod params {
     pub type Params = std::collections::HashMap<&'static str, String>;
 }
 
-mod context {
-    pub type Context =
-        std::collections::HashMap<&'static str, Box<dyn std::any::Any + Send + Sync>>;
-}
-
 pub use crate::{
     codegen::{endpoint, route},
     config::Config,
-    context::Context,
     endpoint::Endpoint,
     error::Error,
     params::Params,
-    req::Req,
     route::{DynamicSegment, Route, StaticSegment},
     router::Router,
     server::Server,
     service::{Service, ServiceFuture},
-    state::State,
     util::read_body,
 };
