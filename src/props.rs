@@ -1,7 +1,7 @@
 use crate::{error::Error, params::Params};
 use std::{future::Future, pin::Pin};
 
-pub type ServiceFuture<T> = Pin<
+pub type PropsFuture<T> = Pin<
     Box<
         dyn Future<Output = Result<(http_types::Request, Params, T), Error>>
             + Send
@@ -10,8 +10,8 @@ pub type ServiceFuture<T> = Pin<
     >,
 >;
 
-/// A trait implemented by functions that can be used as services.  
-pub trait Service: Sized {
+/// A trait implemented by functions that can be used as props.  
+pub trait Props: Sized {
     type Fut: Future<Output = Result<(http_types::Request, Params, Self), Error>>
         + Unpin
         + Send

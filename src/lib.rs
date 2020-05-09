@@ -16,11 +16,11 @@
 //!     Ok(String::from("Hello!"))
 //! }
 //! ```
-//! ## Service
-//! Services are asynchronously constructed components that are passed into endpoints as function
+//! ## Props
+//! Props are asynchronously constructed components that are passed into endpoints as function
 //! arguments.  
 //!
-//! We can pass in a service to the `example_route` above by modifying it to take an argument:
+//! We can pass in a props to the `example_route` above by modifying it to take an argument:
 //! ```
 //! #[endpoint]
 //! async fn example_route(body: Body<String>) -> Result<String, Error> {
@@ -29,15 +29,15 @@
 //!     Ok(String::from("Hello!"))
 //! }
 //! ```
-//! ### Create your own service
-//! In the example above the `Body` service could be implemented as follows: 
+//! ### Create your own props
+//! In the example above the `Body` props could be implemented as follows: 
 //! ```
 //! struct Body<T> {
 //!     inner: Option<T>,
 //! }
 //! 
-//! impl<T: for<'de> Deserialize<'de>> Service for Body<T> {
-//!     type Fut = ServiceFuture<Self>;
+//! impl<T: for<'de> Deserialize<'de>> Props for Body<T> {
+//!     type Fut = PropsFuture<Self>;
 //!
 //!     fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
 //!         Box::pin(async move {
@@ -49,11 +49,11 @@
 //!     }
 //! }
 //! ```
-//! Services have access to the raw request and the params for the route.  Anything data stored
-//! within the request or the params can be made available to an endpoint via a service.  
+//! Propss have access to the raw request and the params for the route.  Anything data stored
+//! within the request or the params can be made available to an endpoint via a props.  
 //!
-//! Before `example_route` is invoked, an instance of the `Body` service is constructed using the
-//! `call` method above.  Constructing an instance of the `Body` service parses the body from the
+//! Before `example_route` is invoked, an instance of the `Body` props is constructed using the
+//! `call` method above.  Constructing an instance of the `Body` props parses the body from the
 //! request and returns `Self`, this instance is then passed in as an argument to `example_route`.
 //!
 //! In this example we have made the parsed JSON body available to the endpoint through the `body`
@@ -81,7 +81,7 @@ mod error;
 mod route;
 mod router;
 mod server;
-mod service;
+mod props;
 mod util;
 
 mod codegen {
@@ -102,6 +102,6 @@ pub use crate::{
     route::{DynamicSegment, Route, StaticSegment},
     router::Router,
     server::Server,
-    service::{Service, ServiceFuture},
+    props::{Props, PropsFuture},
     util::read_body,
 };

@@ -218,13 +218,13 @@ impl Parse for Endpoint {
         let _paren = parenthesized!(content in input);
         let args: Punctuated<FnArg, Token![,]> = content.parse_terminated(FnArg::parse)?;
 
-        let mut services = vec![];
+        let mut props = vec![];
 
         for arg in args {
             if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
                 if let Type::Path(TypePath { path, .. }) = *ty {
                     if let Pat::Ident(PatIdent { ident, .. }) = *pat {
-                        services.push(Service {
+                        props.push(Service {
                             ident: quote!(#ident),
                             ty: quote!(#path),
                         });
@@ -234,23 +234,23 @@ impl Parse for Endpoint {
         }
 
         let mut args = vec![];
-        let mut service_calls = vec![];
+        let mut props_calls = vec![];
 
-        for service in &services {
-            let ident = &service.ident;
-            let ty = &service.ty;
+        for prop in &props {
+            let ident = &prop.ident;
+            let ty = &prop.ty;
 
-            let service_call = quote! {
+            let props_call = quote! {
                 let (req, params, #ident) =
-                    <#ty as Service>::call(req, params).await?;
+                    <#ty as Props>::call(req, params).await?;
             };
-            service_calls.push(service_call);
+            props_calls.push(props_call);
             args.push(quote!(#ident));
         }
 
-        let generated_service_calls = quote! {
+        let generated_props_calls = quote! {
             #(
-                #service_calls
+                #props_calls
             )*
         };
 
@@ -265,7 +265,7 @@ impl Parse for Endpoint {
                 req: http_types::Request,
                 params: Params
             ) -> Result<http_types::Response, Error> {
-                #generated_service_calls
+                #generated_props_calls
                 #generated_endpoint_call
             }
         };

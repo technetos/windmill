@@ -75,8 +75,8 @@ fn parse_header(req: &http_types::Request) -> Result<String, Error> {
 }
 
 
-impl Service for Auth {
-    type Fut = ServiceFuture<Self>;
+impl Props for Auth {
+    type Fut = PropsFuture<Self>;
     fn call(req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             let header = parse_header(&req)?;
@@ -93,8 +93,8 @@ struct Id {
     id: u64,
 }
 
-impl Service for Id {
-    type Fut = ServiceFuture<Self>;
+impl Props for Id {
+    type Fut = PropsFuture<Self>;
     fn call(req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             use std::str::FromStr;
@@ -116,8 +116,8 @@ struct Body<T> {
     inner: Option<T>,
 }
 
-impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Service for Body<T> {
-    type Fut = ServiceFuture<Self>;
+impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Props for Body<T> {
+    type Fut = PropsFuture<Self>;
     fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             let body: Option<T> =
