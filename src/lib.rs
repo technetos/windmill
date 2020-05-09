@@ -20,7 +20,7 @@
 //! Props are asynchronously constructed components that are passed into endpoints as function
 //! arguments.  
 //!
-//! We can pass in a props to the `example_route` above by modifying it to take an argument:
+//! We can pass in a prop to the `example_route` above by modifying it to take an argument:
 //! ```
 //! #[endpoint]
 //! async fn example_route(body: Body<String>) -> Result<String, Error> {
