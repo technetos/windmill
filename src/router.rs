@@ -2,7 +2,6 @@ use crate::{
     endpoint::Endpoint,
     params::Params,
     route::{RawRoute, ResponseFuture, Route},
-    service::Service,
 };
 use http_types::{mime, Method, Mime, StatusCode};
 use std::{collections::HashMap, future::Future, sync::Arc};
