@@ -1,4 +1,4 @@
-use crate::{endpoint::Endpoint, error::Error, params::Params};
+use crate::{error::Error, params::Params};
 use std::{future::Future, pin::Pin};
 
 pub type ServiceFuture<T> = Pin<
@@ -12,7 +12,7 @@ pub type ServiceFuture<T> = Pin<
 
 /// A trait implemented by functions that can be used as services.  
 pub trait Service: Sized {
-    type Fut: Future<Output = (Result<(http_types::Request, Params, Self), Error>)>
+    type Fut: Future<Output = Result<(http_types::Request, Params, Self), Error>>
         + Unpin
         + Send
         + Sync;

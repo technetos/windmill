@@ -2,12 +2,12 @@
 
 use windmill::*;
 
-use http_types::{headers::HeaderName, mime, Method, Mime, StatusCode};
+use http_types::{headers::HeaderName, Method, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
+
+
+
 
 #[derive(Deserialize, Debug)]
 struct ExampleRequest {
@@ -29,7 +29,7 @@ fn main() {
 
 #[endpoint]
 async fn example_route(
-    auth: Auth,
+    _auth: Auth,
     id: Id,
     body: Body<ExampleRequest>,
 ) -> Result<http_types::Response, Error> {
@@ -59,7 +59,7 @@ struct Auth {
 fn parse_header(req: &http_types::Request) -> Result<String, Error> {
     use std::str::FromStr;
     let header_name =
-        HeaderName::from_str("authorization").map_err(|header_name| Error {
+        HeaderName::from_str("authorization").map_err(|_header_name| Error {
             code: StatusCode::InternalServerError,
             msg: json!("bad header name"),
         })?;
@@ -77,7 +77,7 @@ fn parse_header(req: &http_types::Request) -> Result<String, Error> {
 
 impl Service for Auth {
     type Fut = ServiceFuture<Self>;
-    fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
+    fn call(req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             let header = parse_header(&req)?;
 
@@ -95,7 +95,7 @@ struct Id {
 
 impl Service for Id {
     type Fut = ServiceFuture<Self>;
-    fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
+    fn call(req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             use std::str::FromStr;
             let id = u64::from_str(params.get("id").ok_or_else(|| Error {
