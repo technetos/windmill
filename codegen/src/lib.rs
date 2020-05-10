@@ -168,7 +168,7 @@ impl Route {
 }
 
 /// The `route!` macro is used to generate a [`Route`](struct.Route.html) from a path.  
-/// ```
+/// ```ignore
 /// route!(/"path"/param/"path"/"path")
 /// ```
 /// Where `"path"` is a static segment that must be matched verbatim and `param` is a parameter
