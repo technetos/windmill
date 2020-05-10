@@ -16,6 +16,8 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+          override: true
+          components: rustfmt
         name: use nightly
       - uses: actions-rs/cargo@v1
         with:
@@ -27,3 +29,8 @@ jobs:
           command: test
           args: --all
         name: test
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+        name: lint
