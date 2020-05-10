@@ -17,6 +17,7 @@ impl Server {
     ///
     /// ## Examples
     /// ```
+    /// # use windmill::{Config, Server};
     /// let config = Config::new("127.0.0.1:4000");
     /// let server = Server::new(config);
     /// ```
@@ -28,6 +29,8 @@ impl Server {
     ///
     /// ## Examples
     /// ```
+    /// # use windmill::{Config, Router, Server};
+    /// # use async_std::net::TcpListener;
     /// let mut router = Router::new();
     /// let config = Config::new("127.0.0.1:4000");
     ///
