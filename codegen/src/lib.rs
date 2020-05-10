@@ -197,12 +197,6 @@ pub fn route(tokens: TokenStream) -> TokenStream {
 }
 
 #[derive(Debug)]
-struct Service {
-    ident: proc_macro2::TokenStream,
-    ty: proc_macro2::TokenStream,
-}
-
-#[derive(Debug)]
 struct Endpoint {
     tokens: proc_macro2::TokenStream,
 }
@@ -218,47 +212,35 @@ impl Parse for Endpoint {
         let _paren = parenthesized!(content in input);
         let args: Punctuated<FnArg, Token![,]> = content.parse_terminated(FnArg::parse)?;
 
-        let mut props = vec![];
+        let hidden_fn_name = fn_name.prepend("___");
+
+        let mut fn_args = vec![];
+        let mut props_calls = vec![];
 
         for arg in args {
             if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
                 if let Type::Path(TypePath { path, .. }) = *ty {
                     if let Pat::Ident(PatIdent { ident, .. }) = *pat {
-                        props.push(Service {
-                            ident: quote!(#ident),
-                            ty: quote!(#path),
-                        });
+                        let ident = quote!(#ident);
+                        let ty = quote!(#path);
+
+                        let props_call = quote! {
+                            let (req, params, #ident) =
+                                <#ty as Props>::call(req, params).await?;
+                        };
+
+                        props_calls.push(props_call);
+                        fn_args.push(ident);
                     }
                 }
             }
         }
 
-        let mut args = vec![];
-        let mut props_calls = vec![];
-
-        for prop in &props {
-            let ident = &prop.ident;
-            let ty = &prop.ty;
-
-            let props_call = quote! {
-                let (req, params, #ident) =
-                    <#ty as Props>::call(req, params).await?;
-            };
-            props_calls.push(props_call);
-            args.push(quote!(#ident));
-        }
-
-        let generated_props_calls = quote! {
-            #(
-                #props_calls
-            )*
-        };
+        let generated_props_calls = quote!(#(#props_calls)*);
 
         let generated_endpoint_call = quote! {
-            Ok(#fn_name(#(#args),*).await?)
+            Ok(#fn_name(#(#fn_args),*).await?)
         };
-
-        let hidden_fn_name = fn_name.prepend("___");
 
         let endpoint_fn = quote! {
             async fn #hidden_fn_name(
@@ -270,15 +252,7 @@ impl Parse for Endpoint {
             }
         };
 
-        while !input.is_empty() {
-            let _ = input.step(|cursor| {
-                let mut rest = *cursor;
-                while let Some((_, next)) = rest.token_tree() {
-                    rest = next;
-                }
-                Ok(((), rest))
-            });
-        }
+        parse_to_end(input);
 
         Ok(Self {
             tokens: endpoint_fn,
@@ -286,8 +260,20 @@ impl Parse for Endpoint {
     }
 }
 
+fn parse_to_end(input: ParseStream) {
+    while !input.is_empty() {
+        let _ = input.step(|cursor| {
+            let mut rest = *cursor;
+            while let Some((_, next)) = rest.token_tree() {
+                rest = next;
+            }
+            Ok(((), rest))
+        });
+    }
+}
+
 #[proc_macro_attribute]
-pub fn endpoint(attrs: TokenStream, tokens: TokenStream) -> TokenStream {
+pub fn endpoint(_attrs: TokenStream, tokens: TokenStream) -> TokenStream {
     let tokens_clone = tokens.clone();
     let input = parse_macro_input!(tokens_clone as Endpoint);
 
