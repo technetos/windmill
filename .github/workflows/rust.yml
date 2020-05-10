@@ -7,13 +7,19 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  build_and_test:
+    name: build and test windmill
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
-      - name: Build
-        run: cargo +nightly build --verbose --all --examples
-      - name: Run tests
-        run: cargo +nightly test --verbose --all
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --examples --all
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
