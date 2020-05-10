@@ -280,7 +280,6 @@ impl Parse for Endpoint {
             });
         }
 
-
         Ok(Self {
             tokens: endpoint_fn,
         })

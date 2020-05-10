@@ -30,12 +30,12 @@
 //! }
 //! ```
 //! ### Create your own props
-//! In the example above the `Body` props could be implemented as follows: 
+//! In the example above the `Body` props could be implemented as follows:
 //! ```
 //! struct Body<T> {
 //!     inner: Option<T>,
 //! }
-//! 
+//!
 //! impl<T: for<'de> Deserialize<'de>> Props for Body<T> {
 //!     type Fut = PropsFuture<Self>;
 //!
@@ -43,7 +43,7 @@
 //!         Box::pin(async move {
 //!             let body: Option<T> =
 //!                 serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
-//! 
+//!
 //!             Ok((req, params, Body { inner: body }))
 //!         })
 //!     }
@@ -78,10 +78,10 @@
 mod config;
 mod endpoint;
 mod error;
+mod props;
 mod route;
 mod router;
 mod server;
-mod props;
 mod util;
 
 mod codegen {
@@ -99,9 +99,9 @@ pub use crate::{
     endpoint::Endpoint,
     error::Error,
     params::Params,
+    props::{Props, PropsFuture},
     route::{DynamicSegment, Route, StaticSegment},
     router::Router,
     server::Server,
-    props::{Props, PropsFuture},
     util::read_body,
 };

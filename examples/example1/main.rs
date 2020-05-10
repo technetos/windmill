@@ -6,9 +6,6 @@ use http_types::{headers::HeaderName, Method, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
 
-
-
-
 #[derive(Deserialize, Debug)]
 struct ExampleRequest {
     foo: String,
@@ -33,7 +30,6 @@ async fn example_route(
     id: Id,
     body: Body<ExampleRequest>,
 ) -> Result<http_types::Response, Error> {
-
     let body = body.inner.ok_or_else(|| Error {
         code: StatusCode::BadRequest,
         msg: serde_json::json!("body required"),
@@ -58,11 +54,10 @@ struct Auth {
 
 fn parse_header(req: &http_types::Request) -> Result<String, Error> {
     use std::str::FromStr;
-    let header_name =
-        HeaderName::from_str("authorization").map_err(|_header_name| Error {
-            code: StatusCode::InternalServerError,
-            msg: json!("bad header name"),
-        })?;
+    let header_name = HeaderName::from_str("authorization").map_err(|_header_name| Error {
+        code: StatusCode::InternalServerError,
+        msg: json!("bad header name"),
+    })?;
 
     let header = req.header(&header_name).ok_or_else(|| Error {
         code: StatusCode::BadRequest,
@@ -74,17 +69,20 @@ fn parse_header(req: &http_types::Request) -> Result<String, Error> {
     Ok(header)
 }
 
-
 impl Props for Auth {
     type Fut = PropsFuture<Self>;
     fn call(req: http_types::Request, params: Params) -> Self::Fut {
         Box::pin(async move {
             let header = parse_header(&req)?;
 
-            Ok((req, params, Self {
-                user_id: 1,
-                token: header,
-            }))
+            Ok((
+                req,
+                params,
+                Self {
+                    user_id: 1,
+                    token: header,
+                },
+            ))
         })
     }
 }
@@ -127,4 +125,3 @@ impl<T: for<'de> Deserialize<'de> + std::fmt::Debug> Props for Body<T> {
         })
     }
 }
-
