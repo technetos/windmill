@@ -12,14 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        name: checkout source
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+        name: use nightly
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --examples --all
+        name: build
       - uses: actions-rs/cargo@v1
         with:
           command: test
           args: --all
+        name: test
