@@ -9,11 +9,13 @@
 //! ## Endpoint
 //! Endpoints are async functions that match the signature or similar of the function below:
 //! ```
+//! # pub use windmill::*;
+//! # pub use http_types::{Response};
 //! #[endpoint]
-//! async fn example_route() -> Result<String, Error> {
-//!     ...
-//!     ...
-//!     Ok(String::from("Hello!"))
+//! async fn example_route() -> Result<Response, Error> {
+//!     // ...
+//!     // ...
+//!     Ok(Response::from("Hello!"))
 //! }
 //! ```
 //! ## Props
@@ -22,16 +24,36 @@
 //!
 //! We can pass in a prop to the `example_route` above by modifying it to take an argument:
 //! ```
+//! # pub use windmill::*;
+//! # pub use http_types::{Response};
+//! # use serde::Deserialize;
+//! # struct Body<T> {
+//! #     inner: Option<T>,
+//! # }
+//!
+//! # impl<T: for<'de> Deserialize<'de>> Props for Body<T> {
+//! #     type Fut = PropsFuture<Self>;
+//! #     fn call(mut req: http_types::Request, params: Params) -> Self::Fut {
+//! #         Box::pin(async move {
+//! #             let body: Option<T> =
+//! #                 serde_json::from_slice(&read_body(&mut req).await).unwrap_or_else(|_| None);
+//! #             Ok((req, params, Body { inner: body }))
+//! #         })
+//! #     }
+//! # }
+//!
 //! #[endpoint]
-//! async fn example_route(body: Body<String>) -> Result<String, Error> {
-//!     ...
-//!     ...
-//!     Ok(String::from("Hello!"))
+//! async fn example_route(body: Body<String>) -> Result<Response, Error> {
+//!     // ...
+//!     // ...
+//!     Ok(Response::from("Hello!"))
 //! }
 //! ```
 //! ### Create your own props
 //! In the example above the `Body` props could be implemented as follows: 
 //! ```
+//! # pub use windmill::*;
+//! # use serde::Deserialize;
 //! struct Body<T> {
 //!     inner: Option<T>,
 //! }
@@ -62,6 +84,10 @@
 //! # Examples
 //!
 //! ```
+//! # #![feature(proc_macro_hygiene)]
+//! # use windmill::*;
+//! # use http_types::{Method, Response, StatusCode};
+//! # #[endpoint] async fn example_route() -> Result<Response, Error> {  Ok(Response::new(StatusCode::Ok)) }
 //! fn main() {
 //!     let mut router = Router::new();
 //!     let config = Config::new("127.0.0.1:4000");
@@ -72,7 +98,6 @@
 //!         println!("{}", e);
 //!     }
 //! }
-//!
 //! ```
 
 mod config;

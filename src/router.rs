@@ -19,6 +19,7 @@ impl Router {
     ///
     /// ## Examples
     /// ```
+    /// # use windmill::*;
     /// let mut router = Router::new();
     /// ```
     pub fn new() -> Self {
@@ -29,14 +30,18 @@ impl Router {
 
     /// ## Examples
     /// ```
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    ///
     /// #[endpoint]
-    /// async fn example() -> Result<String, Error> {
-    ///     Ok(String::from("greetings"))
+    /// async fn example() -> Result<Response, Error> {
+    ///     Ok(Response::from("greetings"))
     /// }
     ///
     /// #[endpoint]
-    /// async fn example2() -> Result<(), Error> {
-    ///     Ok(())
+    /// async fn example2() -> Result<Response, Error> {
+    ///     Ok(Response::new(StatusCode::Ok))
     /// }
     ///
     /// let mut router = Router::new();
@@ -49,6 +54,12 @@ impl Router {
     ///
     /// When adding routes to the router the order they are added in is sometimes important.  
     /// ```
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    /// # let mut router = Router::new();
+    /// # #[endpoint] async fn example() -> Result<Response, Error> { Ok(Response::from("greetings")) }
+    /// # #[endpoint] async fn example2() -> Result<Response, Error> { Ok(Response::new(StatusCode::Ok)) }
     /// router.add(Method::Get, route!(/a/b/c), ___example);
     /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
     /// ```
@@ -56,6 +67,12 @@ impl Router {
     /// the literal `"a"` as a dynamic segment.  To solve this simply insert _more specific_
     /// routes before _less specific_ routes as seen in the example below.  
     /// ```
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    /// # let mut router = Router::new();
+    /// # #[endpoint] async fn example() -> Result<Response, Error> { Ok(Response::from("greetings")) }
+    /// # #[endpoint] async fn example2() -> Result<Response, Error> { Ok(Response::new(StatusCode::Ok)) }
     /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
     /// router.add(Method::Get, route!(/a/b/c), ___example);
     /// ```
