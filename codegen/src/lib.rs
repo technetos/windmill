@@ -273,10 +273,10 @@ fn parse_to_end(input: ParseStream) {
 }
 /// # The macro used to generate the hidden endpoint functions.  
 ///
-/// The `#[endpoint]` macro generates a function that constructs the props for an endpoint in a short-circut
-/// fashion.  Finally the function invokes endpoint, passing in the props.  The name of the
-/// function is the name of then endpoint preceeded by `___`.  
-///
+/// The `#[endpoint]` macro generates a function that constructs the argument props for an endpoint in
+/// a short-circut fashion from left to right.  Finally the function invokes the endpoint, passing in
+/// the props.  The name of the function is the name of then endpoint preceeded by `___`.  
+/// 
 /// # Examples
 /// ```ignore
 /// #[endpoint]
