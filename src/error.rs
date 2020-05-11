@@ -1,4 +1,5 @@
 /// A HTTP error.  
+#[derive(Debug)]
 pub struct Error {
     pub code: http_types::StatusCode,
     pub msg: serde_json::Value,

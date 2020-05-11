@@ -2,12 +2,14 @@ use crate::{
     endpoint::Endpoint,
     params::Params,
     route::{RawRoute, ResponseFuture, Route},
-    service::Service,
 };
-use http_types::{Method, StatusCode};
+use http_types::{mime, Method, Mime, StatusCode};
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-/// A router for dispatching requests to endpoints.  
+/// The router for routing requests.  
+///
+/// A route in the router is composed of an `http-types::Method`, a
+/// [`Route`](struct.Route.html), and an endpoint.  
 pub struct Router {
     table: HashMap<Method, Vec<Route>>,
 }
@@ -17,6 +19,7 @@ impl Router {
     ///
     /// ## Examples
     /// ```
+    /// # use windmill::*;
     /// let mut router = Router::new();
     /// ```
     pub fn new() -> Self {
@@ -25,57 +28,72 @@ impl Router {
         }
     }
 
-    /// A route in the router is composed of an `http-types::Method`, a
-    /// [`Route`](struct.Route.html), an endpoint and a service.  
-    ///
     /// ## Examples
     /// ```
-    /// async fn example(req: Req<String>) -> Result<String, Error> {
-    ///     Ok(String::from("greetings"))
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    ///
+    /// #[endpoint]
+    /// async fn example() -> Result<Response, Error> {
+    ///     Ok(Response::from("greetings"))
     /// }
     ///
-    /// async fn example2(req: Req<u64>) -> Result<(), Error> {
-    ///     Ok(())
+    /// #[endpoint]
+    /// async fn example2() -> Result<Response, Error> {
+    ///     Ok(Response::new(StatusCode::Ok))
     /// }
     ///
     /// let mut router = Router::new();
     ///
-    /// router.add(Method::Get, route!(/"example"), example, service);
-    /// router.add(Method::Get, route!(/"example2"), example2, service);
+    /// router.add(Method::Get, route!(/"example"), ___example);
+    /// router.add(Method::Get, route!(/"example2"), ___example2);
     /// ```
     ///
     /// ## Precedence and ambiguity
     ///
     /// When adding routes to the router the order they are added in is sometimes important.  
     /// ```
-    /// router.add(Method::Get, route!(/a/b/c, example, service);
-    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    /// # let mut router = Router::new();
+    /// # #[endpoint] async fn example() -> Result<Response, Error> { Ok(Response::from("greetings")) }
+    /// # #[endpoint] async fn example2() -> Result<Response, Error> { Ok(Response::new(StatusCode::Ok)) }
+    /// router.add(Method::Get, route!(/a/b/c), ___example);
+    /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
     /// ```
     /// In the example above the second route will never get run because the first route matches
-    /// the literal "a" as a dynamic segment.  To solve this simply insert _more specific_
+    /// the literal `"a"` as a dynamic segment.  To solve this simply insert _more specific_
     /// routes before _less specific_ routes as seen in the example below.  
     /// ```
-    /// router.add(Method::Get, route!(/"a"/b/c, example2, service);
-    /// router.add(Method::Get, route!(/a/b/c, example, service);
+    /// # #![feature(proc_macro_hygiene)]
+    /// # use windmill::*;
+    /// # use http_types::{Method, Response, StatusCode};
+    /// # let mut router = Router::new();
+    /// # #[endpoint] async fn example() -> Result<Response, Error> { Ok(Response::from("greetings")) }
+    /// # #[endpoint] async fn example2() -> Result<Response, Error> { Ok(Response::new(StatusCode::Ok)) }
+    /// router.add(Method::Get, route!(/"a"/b/c), ___example2);
+    /// router.add(Method::Get, route!(/a/b/c), ___example);
     /// ```
-    pub fn add<Body, Res, E, S>(
-        &mut self,
-        method: Method,
-        mut route: Route,
-        endpoint: E,
-        service: S,
-    ) where
-        E: Endpoint<Body, Res> + Send + Sync,
-        S: Service<Body, Res, E> + Send + Sync,
-    {
+    pub fn add(&mut self, method: Method, mut route: Route, endpoint: impl Endpoint + Send + Sync) {
         let entry = self
             .table
             .entry(method)
             .or_insert_with(|| Vec::<Route>::new());
 
-        // haha type erasure is awesome
         let handler = move |req: http_types::Request, params: Params| -> ResponseFuture {
-            Box::pin(service.call(req, params, endpoint))
+            Box::pin(async move {
+                match endpoint.call(req, params).await {
+                    Ok(res) => res,
+                    Err(e) => {
+                        let mut res = response(e.code(), mime::JSON);
+                        let bytes = serde_json::to_vec(e.msg()).unwrap();
+                        res.set_body(bytes);
+                        res
+                    }
+                }
+            })
         };
 
         route.handler = Some(Box::new(handler));
@@ -142,4 +160,10 @@ fn paths_match(route: &Route, raw_route: &RawRoute) -> bool {
 
 async fn not_found() -> http_types::Response {
     http_types::Response::new(StatusCode::NotFound)
+}
+
+fn response(code: StatusCode, mime: Mime) -> http_types::Response {
+    let mut res = http_types::Response::new(code);
+    let _ = res.set_content_type(mime);
+    res
 }
