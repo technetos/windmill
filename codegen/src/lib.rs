@@ -276,7 +276,7 @@ fn parse_to_end(input: ParseStream) {
 /// The `#[endpoint]` macro generates a function that constructs the props for an endpoint in a short-circut
 /// fashion.  Finally the function invokes endpoint, passing in the props.  The name of the
 /// function is the name of then endpoint preceeded by `___`.  
-/// 
+///
 /// # Examples
 /// ```ignore
 /// #[endpoint]
@@ -297,7 +297,7 @@ fn parse_to_end(input: ParseStream) {
 ///     let response = http_types::Response::new(http_types::StatusCode::Ok);
 ///     Ok(response)
 /// }
-/// 
+///
 /// ```
 #[proc_macro_attribute]
 pub fn endpoint(_attrs: TokenStream, tokens: TokenStream) -> TokenStream {
