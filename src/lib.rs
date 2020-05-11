@@ -83,7 +83,7 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```no_run
 //! # #![feature(proc_macro_hygiene)]
 //! # use windmill::*;
 //! # use http_types::{Method, Response, StatusCode};

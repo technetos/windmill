@@ -28,7 +28,7 @@ impl Server {
     /// Start accepting requests on the server using the provided router.  
     ///
     /// ## Examples
-    /// ```
+    /// ```no_run
     /// # use windmill::{Config, Router, Server};
     /// # use async_std::net::TcpListener;
     /// let mut router = Router::new();
