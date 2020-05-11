@@ -278,7 +278,7 @@ fn parse_to_end(input: ParseStream) {
 /// function is the name of then endpoint preceeded by `___`.  
 /// 
 /// # Examples
-/// ```
+/// ```ignore
 /// #[endpoint]
 /// async fn my_main_handler(env: EnvVarsProps, body: Body<String>) -> Result<http_types::Response, Error> {
 ///     let response = http_types::Response::new(http_types::StatusCode::Ok);
@@ -287,7 +287,7 @@ fn parse_to_end(input: ParseStream) {
 /// ```
 /// Generates the following code
 ///
-/// ```
+/// ```ignore
 /// async fn ___my_main_handler(req: http_types::Request, params: Params) -> Result<http_types::Response, Error> {
 ///     let (req, params, env) = <EnvVarsProps as Props>::call(req, params).await?;
 ///     let (req, params, body) = <Body<String> as Props>::call(req, params).await?;
