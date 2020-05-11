@@ -71,7 +71,7 @@
 //!     }
 //! }
 //! ```
-//! Propss have access to the raw request and the params for the route.  Anything data stored
+//! Props have access to the raw request and the params for the route.  Anything data stored
 //! within the request or the params can be made available to an endpoint via a props.  
 //!
 //! Before `example_route` is invoked, an instance of the `Body` props is constructed using the

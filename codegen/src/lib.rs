@@ -271,7 +271,34 @@ fn parse_to_end(input: ParseStream) {
         });
     }
 }
-
+/// # The macro used to generate the hidden endpoint functions.  
+///
+/// The `#[endpoint]` macro generates a function that constructs the props for an endpoint in a short-circut
+/// fashion.  Finally the function invokes endpoint, passing in the props.  The name of the
+/// function is the name of then endpoint preceeded by `___`.  
+/// 
+/// # Examples
+/// ```
+/// #[endpoint]
+/// async fn my_main_handler(env: EnvVarsProps, body: Body<String>) -> Result<http_types::Response, Error> {
+///     let response = http_types::Response::new(http_types::StatusCode::Ok);
+///     Ok(response)
+/// }
+/// ```
+/// Generates the following code
+///
+/// ```
+/// async fn ___my_main_handler(req: http_types::Request, params: Params) -> Result<http_types::Response, Error> {
+///     let (req, params, env) = <EnvVarsProps as Props>::call(req, params).await?;
+///     let (req, params, body) = <Body<String> as Props>::call(req, params).await?;
+///     Ok(my_main_handler(env, body).await?)
+/// }
+/// async fn my_main_handler(env: EnvVarsProps, body: Body<String>) -> Result<http_types::Response, Error> {
+///     let response = http_types::Response::new(http_types::StatusCode::Ok);
+///     Ok(response)
+/// }
+/// 
+/// ```
 #[proc_macro_attribute]
 pub fn endpoint(_attrs: TokenStream, tokens: TokenStream) -> TokenStream {
     let tokens_clone = tokens.clone();
